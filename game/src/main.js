@@ -356,7 +356,7 @@ function frame() {
         parkedCars: cars,
       });
       peds.update(dt, {
-        playerPos,
+        playerPos: player.pos,
         playerCar: state.car,
         playerInCar: state.inCar,
         trafficCars: traffic.cars,

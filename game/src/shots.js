@@ -92,7 +92,11 @@ export function stageShot(name, ctx) {
     traffic.place(1, -3.5, -110, 'ns', -1, 10);
     peds.place(0, 12, -10);
     peds.place(1, -12, 10);
-    ctx.setCamera(14, 6.5, -58, 0, 2, -30);
+    // Side-elevation of the avenue: Mara's car drives past left-to-right
+    // with both patrol cars trailing behind it in the same lane. A fixed
+    // camera is robust here because the car crosses the frame, not away
+    // from it, whatever the headless frame rate is.
+    ctx.setCamera(24, 6, -10, 0, 2, -30);
     ctx.setState('playing');
     return 'fixed';
   }
