@@ -44,7 +44,7 @@ export function createMissions(scene) {
   // Marker: a floating octahedron over a light pillar, visible from afar.
   const marker = new THREE.Group();
   const gem = new THREE.Mesh(
-    new THREE.OctahedronGeometry(1.6),
+    new THREE.OctahedronGeometry(2.1),
     new THREE.MeshBasicMaterial({ color: 0xffd23f }),
   );
   gem.position.y = 6;

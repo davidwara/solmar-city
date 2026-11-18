@@ -116,9 +116,11 @@ export function stageShot(name, ctx) {
     near.group.position.set(-168, 0, 186);
     near.group.rotation.y = Math.PI / 2;
     traffic.place(0, -62, 186, 'ew', 1, 10);
-    peds.place(0, -156, 200);
-    peds.place(1, -146, 214);
-    ctx.setCamera(-126, 4.5, 194, -148, 3, 222);
+    peds.place(0, -152, 218);
+    peds.place(1, -128, 200);
+    // Over Mara's shoulder: she fills the foreground, the pier, the gold
+    // beacon and the boats fill the background.
+    ctx.setCamera(-136, 3.2, 200, -152, 3, 226);
     ctx.setState('playing');
     return 'fixed';
   }
