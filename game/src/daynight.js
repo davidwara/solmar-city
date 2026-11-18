@@ -45,6 +45,20 @@ function sampleKeys(hours) {
   };
 }
 
+/**
+ * Lighthouse beam brightness for an hour: 0 by day, 1 in the deep night,
+ * ramping smoothly up at dusk (19:00–20:30) and down at dawn (05:00–07:00)
+ * so the beam fades in and out instead of snapping. island.js drives the
+ * beam cone and lamp from this value.
+ */
+export function lighthouseBeamIntensity(hour) {
+  const h = ((hour % 24) + 24) % 24;
+  if (h >= 20.5 || h < 5) return 1;
+  if (h < 7) return 1 - (h - 5) / 2;
+  if (h < 19) return 0;
+  return (h - 19) / 1.5;
+}
+
 /** "07:30" / "23:05" style clock text for the HUD. */
 export function formatClock(hours) {
   const h = Math.floor(((hours % 24) + 24) % 24);

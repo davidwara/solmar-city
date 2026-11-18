@@ -612,15 +612,15 @@ function frame() {
       story.update(dt);
       player.aiming = weapons.owned && !state.inCar && !state.inBoat;
       if (state.inBoat && state.boat) {
-        boats.update(dt, input, state.boat, clock.elapsedTime);
+        boats.update(dt, input, state.boat, clock.elapsedTime, audio);
       } else if (state.inCar && state.car) {
-        boats.update(dt, input, null, clock.elapsedTime);
+        boats.update(dt, input, null, clock.elapsedTime, audio);
         updateCar(state.car, dt, input, city.colliders, CITY.bound, weather.gripFactor());
       } else {
-        boats.update(dt, input, null, clock.elapsedTime);
+        boats.update(dt, input, null, clock.elapsedTime, audio);
         updatePlayer(player, dt, input, state.cameraYaw, city.colliders, CITY.bound);
       }
-      island.update(dt, daynight.isNight);
+      island.update(dt, daynight.hours);
       state.nearCar = state.inCar || state.inBoat ? null : nearestCar(cars, player.pos, 4.5);
       state.nearBoat = state.inCar || state.inBoat ? null : boats.nearest(player.pos, 6);
       state.nearGarage = !state.inCar && !state.inBoat && customization.nearGarage(player.pos);
@@ -743,7 +743,7 @@ function frame() {
 
       // --- weather + hidden packages ----------------------------------------
       weather.update(dt, focusPos, audio);
-      const packEvents = collectibles.update(dt, focusPos);
+      const packEvents = collectibles.update(dt, focusPos, daynight.hours);
       if (packEvents.collected > 0) {
         state.money += packEvents.collected * 100;
         audio.chime();

@@ -7,6 +7,7 @@
 // from ISLAND_BOUNDS, and its buildings block movement like the mainland's.
 import * as THREE from 'three';
 import { createRng, pick, rand } from './utils.js';
+import { lighthouseBeamIntensity } from './daynight.js';
 
 // Island land: a rounded rectangle of dry ground in the middle of the bay.
 export const ISLAND_BOUNDS = { minX: -80, maxX: 160, minZ: 300, maxZ: 430 };
@@ -227,16 +228,20 @@ export function buildIsland(scene, seed) {
     lighthouse.beamMat.opacity = 0.3;
   }
 
-  /** Rotate the beam at night; the lamp glows faintly even unlit. */
-  function update(dt, isNight) {
-    if (lit && isNight) {
+  /** Rotate the beam at night; the lamp glows faintly even unlit. The
+   *  beam's brightness follows the hour (daynight.js): full at night,
+   *  fading in at dusk and out at dawn, dark by day. */
+  function update(dt, hours) {
+    const beam = lighthouseBeamIntensity(hours);
+    if (lit && beam > 0.05) {
       beamAngle += dt * 0.55;
       lighthouse.beamPivot.rotation.y = beamAngle;
       lighthouse.beamPivot.visible = true;
-    } else if (lit) {
-      lighthouse.beamPivot.visible = false;
+      lighthouse.beamMat.opacity = 0.3 * beam;
+      lighthouse.lampLight.intensity = 60 * beam;
     } else {
       lighthouse.beamPivot.visible = false;
+      if (lit) lighthouse.lampLight.intensity = 8;
     }
   }
 

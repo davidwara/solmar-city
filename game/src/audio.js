@@ -10,6 +10,9 @@ export function createAudio() {
     master: null,
     engineOsc: null,
     engineGain: null,
+    boatEngineOsc: null,
+    boatEngineGain: null,
+    boatNoiseGain: null,
     sirenOsc: null,
     sirenGain: null,
     sirenLfo: null,
@@ -53,6 +56,32 @@ export function createAudio() {
       engineFilter.connect(audio.engineGain);
       audio.engineGain.connect(audio.master);
       audio.engineOsc.start();
+      // Boat engine: a low triangle hum plus filtered white-noise wash
+      // (the outboard's spray), both silent until a boat is driven.
+      audio.boatEngineOsc = audio.ctx.createOscillator();
+      audio.boatEngineOsc.type = 'triangle';
+      audio.boatEngineOsc.frequency.value = 42;
+      audio.boatEngineGain = audio.ctx.createGain();
+      audio.boatEngineGain.gain.value = 0;
+      audio.boatEngineOsc.connect(audio.boatEngineGain);
+      audio.boatEngineGain.connect(audio.master);
+      audio.boatEngineOsc.start();
+      const noiseBuf = audio.ctx.createBuffer(1, audio.ctx.sampleRate, audio.ctx.sampleRate);
+      const noiseData = noiseBuf.getChannelData(0);
+      for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
+      const noiseSrc = audio.ctx.createBufferSource();
+      noiseSrc.buffer = noiseBuf;
+      noiseSrc.loop = true;
+      const noiseFilter = audio.ctx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = 320;
+      noiseFilter.Q.value = 0.8;
+      audio.boatNoiseGain = audio.ctx.createGain();
+      audio.boatNoiseGain.gain.value = 0;
+      noiseSrc.connect(noiseFilter);
+      noiseFilter.connect(audio.boatNoiseGain);
+      audio.boatNoiseGain.connect(audio.master);
+      noiseSrc.start();
       // Siren: a sine that wails between two tones via an LFO.
       audio.sirenOsc = audio.ctx.createOscillator();
       audio.sirenOsc.type = 'sine';
@@ -141,6 +170,23 @@ export function createAudio() {
     ensure();
     blip(900, 0.05, 'square', 0.15);
     blip(700, 0.05, 'square', 0.15, 0.18);
+  }
+
+  /** Boat engine: pitch + spray follow the driven boat's speed 0..1.
+   *  Call every frame from boats.js; 0 (or no boat) silences it. */
+  function setBoatEngine(speed01) {
+    ensure();
+    if (!audio.ctx) return;
+    const s = Math.max(0, Math.min(1, speed01 || 0));
+    try {
+      if (audio.boatEngineOsc) {
+        audio.boatEngineGain.gain.setTargetAtTime(s > 0.02 ? 0.03 + 0.05 * s : 0, audio.ctx.currentTime, 0.15);
+        audio.boatEngineOsc.frequency.setTargetAtTime(42 + s * 55, audio.ctx.currentTime, 0.15);
+      }
+      if (audio.boatNoiseGain) {
+        audio.boatNoiseGain.gain.setTargetAtTime(s > 0.02 ? 0.025 * s : 0, audio.ctx.currentTime, 0.2);
+      }
+    } catch { /* sound is garnish, never fatal */ }
   }
 
   /** Car horn: two-tone beep, the sound of Solmar traffic losing patience. */
@@ -239,6 +285,7 @@ export function createAudio() {
   audio.dryClick = dryClick;
   audio.reloadClick = reloadClick;
   audio.horn = horn;
+  audio.setBoatEngine = setBoatEngine;
   audio.thunder = thunder;
   audio.shutter = shutter;
   audio.toggleStation = toggleStation;

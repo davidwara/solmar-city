@@ -14,6 +14,19 @@ export const PACKAGE_BONUS = 1000;
 export const PACKAGE_RADIUS = 3.5;
 export const PACKAGE_REVEAL = 60;
 
+/**
+ * Hidden-package glow brightness for an hour of day and a game-time
+ * clock: 0..1, pulsing on a sine of game time and brighter at night
+ * (day ~0.35, deep night 1.0, smooth ramps at dawn and dusk) so the
+ * packages are easier to spot after dark.
+ */
+export function packageGlow(hour, time) {
+  const h = ((hour % 24) + 24) % 24;
+  const night = h >= 20.5 || h < 5 ? 1 : h < 7 ? 1 - (h - 5) / 2 : h < 19 ? 0 : (h - 19) / 1.5;
+  const pulse = 0.75 + 0.25 * Math.sin(time * 3);
+  return Math.min(1, (0.35 + 0.65 * night) * pulse);
+}
+
 // Stash spots: alleys, beach corners, the marina pier, downtown nooks.
 const SPOTS = [
   [-150, 225], // marina pier — where the first job starts
@@ -102,14 +115,18 @@ export function createCollectibles(scene, seed) {
    * Spin + bob the gems; grab any Mara walks or drives through.
    * Returns { collected, bonus }: how many were just taken, and true
    * when the set is complete (the $1,000 bonus pays then).
+   * `hour` drives the glow: packages pulse brighter at night.
    */
-  function update(dt, focusPos) {
+  function update(dt, focusPos, hour = 10) {
     const events = { collected: 0, bonus: false };
     collectibles.timer += dt;
+    const glow = packageGlow(hour, collectibles.timer);
     for (const it of items) {
       if (it.taken) continue;
       it.gem.position.y = 1.6 + Math.sin(collectibles.timer * 2 + it.phase) * 0.35;
       it.gem.rotation.y += dt * 1.8;
+      it.gem.scale.setScalar(0.9 + 0.25 * glow);
+      it.ring.material.opacity = 0.25 + 0.55 * glow;
       it.ring.rotation.z += dt * 0.8;
       const d = Math.hypot(it.pos.x - focusPos.x, it.pos.z - focusPos.z);
       if (d < PACKAGE_RADIUS) {

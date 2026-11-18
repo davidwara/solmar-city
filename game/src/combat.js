@@ -11,6 +11,20 @@ import { damageCar } from './vehicles.js';
 const PUNCH_RANGE = 2.4;
 const PUNCH_COOLDOWN = 0.45;
 
+/**
+ * Knock a target down for `ms` milliseconds: it cannot attack while down.
+ * Sets the shared down state (down flag + downTimer in seconds, figure
+ * hidden) that the gangs update loop already ticks down and recovers
+ * from — rivals stay out of the fight for the full timer.
+ */
+export function applyKnockdown(target, ms) {
+  if (!target || target.down) return false;
+  target.down = true;
+  target.downTimer = Math.max(0, ms || 0) / 1000;
+  if (target.figure) target.figure.visible = false;
+  return true;
+}
+
 /** Create the combat state (just a cooldown timer). */
 export function createCombat() {
   const combat = { cooldown: 0 };

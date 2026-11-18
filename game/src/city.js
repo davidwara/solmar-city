@@ -280,6 +280,13 @@ export function setTimeOfDay(scene, city, t) {
 
 // --- Phase 2 helpers: road + sidewalk points for traffic and pedestrians ---
 
+/** True when a world position stands on the island causeway bridge: the
+ *  narrow deck at x = 40 running from the beach (z ~247) to the island's
+ *  north shore (z ~305). Movement code uses this to let Mara cross dry. */
+export function isOnCauseway(x, z) {
+  return Math.abs(x - 40) <= 5.5 && z >= 247 && z <= 305;
+}
+
 /** A random point on a road centreline, with the driving direction along it. */
 export function randomRoadPoint(rng) {
   const street = pick(rng, CITY.streets);

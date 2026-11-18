@@ -177,8 +177,9 @@ export function createBoats(scene) {
     return best;
   }
 
-  /** Drive the boat under input (W throttle, S reverse, A/D rudder). */
-  function update(dt, input, drivenBoat, time) {
+  /** Drive the boat under input (W throttle, S reverse, A/D rudder).
+   *  `audio` is optional: the driven boat's engine hum follows its speed. */
+  function update(dt, input, drivenBoat, time, audio) {
     // Every boat bobs gently on the swell, driven or moored.
     for (const boat of boats) {
       const bob = Math.sin(time * 1.4 + boat.bobPhase) * 0.14;
@@ -189,7 +190,11 @@ export function createBoats(scene) {
       boat.navLight.visible = Math.sin(time * 3 + boat.bobPhase) > -0.4;
     }
     updateWake(dt);
-    if (!drivenBoat) return;
+    if (!drivenBoat) {
+      // Nobody aboard: the outboard falls silent.
+      if (audio && audio.setBoatEngine) audio.setBoatEngine(0);
+      return;
+    }
 
     // Throttle: a boat gathers speed slowly and glides a long way.
     const throttle = (input.forward ? 11 : 0) + (input.back ? -5 : 0);
@@ -230,6 +235,8 @@ export function createBoats(scene) {
       spawnWake(drivenBoat);
       wakeTimer = Math.abs(drivenBoat.speed) > 14 ? 0.05 : 0.12;
     }
+    // Engine hum follows the driven boat's speed (0 when moored).
+    if (audio && audio.setBoatEngine) audio.setBoatEngine(Math.abs(drivenBoat.speed) / 24);
   }
 
   /** Where Mara steps ashore when she leaves a boat: nearest dry land. */

@@ -7,6 +7,7 @@
 // tripod as much as the getaway legs.
 import * as THREE from 'three';
 import { clamp } from './utils.js';
+import { isOnCauseway } from './city.js';
 
 const WALK_SPEED = 5;
 const RUN_SPEED = 9.5;
@@ -136,8 +137,15 @@ export function updatePlayer(player, dt, input, cameraYaw, colliders, bound) {
       player.grounded = true;
     }
   }
+  // The beach line normally stops Mara at z = bound + 40 — except on the
+  // causeway, where she may walk dry across to the island (z up to 430).
+  // Once past the beach on the causeway line, or already standing on the
+  // island itself, the island side stays open so she is never snapped back.
+  const onCausewayRoute = isOnCauseway(player.pos.x, player.pos.z)
+    || (Math.abs(player.pos.x - 40) <= 5.5 && player.pos.z > bound + 40)
+    || (player.pos.z > 305 && player.pos.x >= -80 && player.pos.x <= 160);
   player.pos.x = clamp(player.pos.x, -bound, bound);
-  player.pos.z = clamp(player.pos.z, -bound, bound + 40);
+  player.pos.z = clamp(player.pos.z, -bound, onCausewayRoute ? 430 : bound + 40);
   resolveCollisions(player.pos, RADIUS, colliders);
   player.group.position.copy(player.pos);
   player.group.rotation.y = player.heading;

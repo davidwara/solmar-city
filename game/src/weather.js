@@ -51,6 +51,57 @@ export function createWeather(scene, city, daynight) {
   rain.frustumCulled = false;
   scene.add(rain);
 
+  // --- rain ripples: expanding rings where drops hit the bay ------------
+  // A small recycled pool (≤12) of flat rings on the water near the
+  // player; each grows, fades, and is reused. Cheap: no new meshes per
+  // frame, and they only run while it is actually raining.
+  const RIPPLE_MAX = 12;
+  const ripples = [];
+  for (let i = 0; i < RIPPLE_MAX; i++) {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.32, 0.5, 20),
+      new THREE.MeshBasicMaterial({ color: 0xcfe8f7, transparent: true, opacity: 0, depthWrite: false }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.12;
+    ring.visible = false;
+    scene.add(ring);
+    ripples.push({ mesh: ring, life: 0 });
+  }
+  let rippleCursor = 0;
+  let rippleTimer = 0;
+
+  /** Spawn + grow the rain rings on the bay surface near the player. */
+  function updateRainRipples(dt, focusPos) {
+    if (weather.rainLevel <= 0.4) {
+      for (const r of ripples) { r.life = 0; r.mesh.visible = false; }
+      return;
+    }
+    rippleTimer -= dt;
+    if (rippleTimer <= 0) {
+      rippleTimer = 0.12 + Math.random() * 0.1;
+      const r = ripples[rippleCursor];
+      rippleCursor = (rippleCursor + 1) % ripples.length;
+      // Drops land on water: keep the ring on the bay (z >= 260), even
+      // when Mara herself is standing on the beach or the pier.
+      r.mesh.position.set(
+        Math.max(-260, Math.min(260, focusPos.x + (Math.random() - 0.5) * 30)),
+        0.12,
+        Math.max(260, Math.min(460, focusPos.z + (Math.random() - 0.5) * 24)),
+      );
+      r.mesh.visible = true;
+      r.life = 1;
+    }
+    for (const r of ripples) {
+      if (r.life <= 0) continue;
+      r.life -= dt * 1.4;
+      if (r.life <= 0) { r.mesh.visible = false; continue; }
+      const s = 1 + (1 - r.life) * 3.2;
+      r.mesh.scale.set(s, s, 1);
+      r.mesh.material.opacity = 0.55 * r.life * weather.rainLevel;
+    }
+  }
+
   // --- lightning: a white directional light that only fires on a strike --
   const bolt = new THREE.DirectionalLight(0xdfeaff, 0);
   bolt.position.set(80, 220, -40);
@@ -124,6 +175,8 @@ export function createWeather(scene, city, daynight) {
     } else {
       rain.visible = false;
     }
+    // Rings where the rain hits the bay, riding with the player.
+    updateRainRipples(dt, focusPos);
 
     // --- wet sheen: roads darken as the rain soaks in --------------------
     if (city.roadMat) {
@@ -156,6 +209,7 @@ export function createWeather(scene, city, daynight) {
   weather.gripFactor = gripFactor;
   weather.iconText = iconText;
   weather.update = update;
+  weather.updateRainRipples = updateRainRipples;
   weather.raining = false;
   return weather;
 }

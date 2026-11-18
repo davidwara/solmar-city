@@ -9,6 +9,7 @@
 // the Sharks' turf emptied completely.
 import * as THREE from 'three';
 import { createRng, rand } from './utils.js';
+import { applyKnockdown } from './combat.js';
 
 // Turf zones: centre, radius, owning gang, and the colour the minimap uses.
 export const GANGS = [
@@ -126,13 +127,10 @@ export function createGangs(scene, seed) {
     }
   }
 
-  /** Knock a rival down (punch / shot): he stays down 25 seconds. */
+  /** Knock a rival down (punch / shot): he stays down 25 seconds, unable
+   *  to attack — the shared knockdown state from combat.js. */
   function knockDown(member) {
-    if (!member || member.down) return false;
-    member.down = true;
-    member.downTimer = 25;
-    member.figure.visible = false;
-    return true;
+    return applyKnockdown(member, 25000);
   }
 
   /** Nearest standing rival to a point (for punches and shots). */
