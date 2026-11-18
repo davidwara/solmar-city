@@ -54,3 +54,11 @@ export function wrapAngle(a) {
 export function dist2D(ax, az, bx, bz) {
   return Math.hypot(ax - bx, az - bz);
 }
+
+/** Shortest signed angle from a to b, in [-PI, PI]. Used by pursuit AI. */
+export function angleDiff(a, b) {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}

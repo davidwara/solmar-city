@@ -17,9 +17,27 @@ stash.
 
 - **Move** — WASD · **Look** — mouse
 - **Run** — Shift · **Jump** — Space
-- **Enter / exit car** — E
+- **Enter / exit car** — E (stealing a parked car raises your wanted level)
+- **Punch** — F · **Mute** — M · **Jobs** — J · **Retry job** — R
 - **Pause** — Esc or P
-- **HUD** — health, money, minimap, objective line
+- **HUD** — health, money, wanted stars, mission tracker, minimap
+  (traffic, police, pedestrians, mission marker)
+
+## The living city (Phase 2)
+
+Traffic cruises the avenues and overtakes parked cars; pedestrians walk
+the sidewalks and flee from speeding cars. The police respond to a 1–3
+star wanted level — steal a car, hit a pedestrian or crash into traffic
+and patrol cars chase you down, ram you, and bust you on foot if they
+catch you. Stay out of sight and the heat cools off.
+
+Three story jobs pay cash and unlock in order: **First Job** (pick up the
+package at the marina, $250), **Hot Delivery** (deliver downtown while
+wanted, $500), **The Getaway** (reach the beachfront safehouse in 90
+seconds, $750). Progress, money and best wanted level save to the
+browser (localStorage) — hit **Continue** on the start screen to pick
+up where you left off. Sound is fully procedural WebAudio: engine hum,
+siren, footsteps, chimes — no audio files.
 
 ## Play it
 
@@ -30,9 +48,10 @@ node serve.ts   # serves game/ on http://localhost:8080
 ## Screenshots
 
 The game stages its own screenshot scenes deterministically:
-`?shot=drive|street|vista|menu&seed=N` plays the real rules forward and sets
-`window.__shotReady` when the frame is painted. See `shots.json` for the four
-shots this entry hands in.
+`?shot=drive|street|vista|menu|chase|mission&seed=N` plays the real rules
+forward and sets `window.__shotReady` when the frame is painted. See
+`shots.json` for the four shots this entry hands in: the cover drive, a
+police chase at two stars, the marina mission, and the golden-hour vista.
 
 ## Entry
 

@@ -50,10 +50,16 @@ export function createPlayer(scene) {
     walkPhase: 0,
     moving: false,
     running: false,
+    punchTimer: 0, // counts down while the punch animation plays (combat.js)
   };
   group.position.copy(player.pos);
   player.parts = { legL, legR, armL, armR };
   return player;
+}
+
+/** Start Mara's punch animation (called by combat.js when F is pressed). */
+export function setPunch(player) {
+  player.punchTimer = 0.35;
 }
 
 /** Push a circle (x,z,radius) out of every building AABB it overlaps. */
@@ -131,10 +137,16 @@ export function updatePlayer(player, dt, input, cameraYaw, colliders, bound) {
   resolveCollisions(player.pos, RADIUS, colliders);
   player.group.position.copy(player.pos);
   player.group.rotation.y = player.heading;
-  // Walk-cycle swing.
+  // Walk-cycle swing, overridden by the punch on the right arm.
   const swing = player.moving ? Math.sin(player.walkPhase) * 0.55 : 0;
   player.parts.legL.rotation.x = swing;
   player.parts.legR.rotation.x = -swing;
   player.parts.armL.rotation.x = -swing * 0.8;
-  player.parts.armR.rotation.x = swing * 0.8;
+  if (player.punchTimer > 0) {
+    player.punchTimer -= dt;
+    // Right arm snaps forward, then drops back as the timer runs out.
+    player.parts.armR.rotation.x = -1.5 * Math.sin((0.35 - Math.max(0, player.punchTimer)) / 0.35 * Math.PI);
+  } else {
+    player.parts.armR.rotation.x = swing * 0.8;
+  }
 }

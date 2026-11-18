@@ -1,6 +1,7 @@
-// HUD: health, money, wanted stars, objective line, and a live 2D minimap.
+// HUD: health, money, wanted stars, mission tracker, and a live 2D minimap.
 // The minimap is a top-down canvas: roads, beach, sea, the player arrow,
-// parked cars and the current objective marker.
+// parked cars, moving traffic (grey), police (flashing blue/red), nearby
+// pedestrians (tiny dots) and the current mission marker (gold diamond).
 import { CITY } from './city.js';
 
 const STREETS = CITY.streets;
@@ -15,6 +16,8 @@ export function createHud() {
     speed: document.getElementById('speed'),
     hint: document.getElementById('hint'),
     minimap: document.getElementById('minimap'),
+    toast: document.getElementById('toast'),
+    missionList: document.getElementById('mission-list'),
   };
   const ctx = els.minimap.getContext('2d');
   const S = els.minimap.width; // 190
@@ -24,8 +27,11 @@ export function createHud() {
   function toMap(x, z) {
     return [(x - WORLD_MIN) * scale, (z - WORLD_MIN) * scale];
   }
+  let toastTimer = null;
+  let flashPhase = 0;
 
-  function drawMinimap(playerPos, heading, cars, inCar, objectivePos) {
+  function drawMinimap(playerPos, heading, cars, inCar, objectivePos, extra) {
+    flashPhase += 0.08;
     ctx.fillStyle = '#101820';
     ctx.fillRect(0, 0, S, S);
     // Sea + beach (south edge).
@@ -44,19 +50,40 @@ export function createHud() {
       const [, z] = toMap(0, c);
       ctx.beginPath(); ctx.moveTo(0, z); ctx.lineTo(S, z); ctx.stroke();
     }
-    // Objective marker (marina).
+    // Mission marker (gold diamond, pulsing).
     if (objectivePos) {
       const [ox, oy] = toMap(objectivePos.x, objectivePos.z);
+      const r = 7 + Math.sin(flashPhase * 2) * 1.5;
       ctx.fillStyle = '#ffd23f';
       ctx.beginPath();
-      ctx.moveTo(ox, oy - 7); ctx.lineTo(ox + 6, oy); ctx.lineTo(ox, oy + 7); ctx.lineTo(ox - 6, oy);
+      ctx.moveTo(ox, oy - r); ctx.lineTo(ox + r * 0.85, oy); ctx.lineTo(ox, oy + r); ctx.lineTo(ox - r * 0.85, oy);
       ctx.closePath(); ctx.fill();
     }
-    // Cars.
+    // Moving traffic (grey dots).
+    for (const w of extra.traffic || []) {
+      const [tx, ty] = toMap(w.car.pos.x, w.car.pos.z);
+      ctx.fillStyle = '#b8c4cc';
+      ctx.beginPath(); ctx.arc(tx, ty, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+    // Pedestrians (tiny pale dots, only near the player to avoid clutter).
+    for (const p of extra.peds || []) {
+      const d = Math.hypot(p.pos.x - playerPos.x, p.pos.z - playerPos.z);
+      if (d > 90) continue;
+      const [px, py] = toMap(p.pos.x, p.pos.z);
+      ctx.fillStyle = p.down ? '#ff5a5a' : '#d8e6ee';
+      ctx.beginPath(); ctx.arc(px, py, 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+    // Parked cars (orange; white when driven).
     for (const car of cars) {
       const [cx, cy] = toMap(car.pos.x, car.pos.z);
       ctx.fillStyle = car.driven ? '#ffffff' : '#ff8a3d';
       ctx.beginPath(); ctx.arc(cx, cy, car.driven ? 4 : 3, 0, Math.PI * 2); ctx.fill();
+    }
+    // Police (flashing blue/red).
+    for (const unit of extra.police || []) {
+      const [px, py] = toMap(unit.car.pos.x, unit.car.pos.z);
+      ctx.fillStyle = Math.sin(flashPhase * 3) > 0 ? '#3d7bff' : '#ff3d3d';
+      ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
     }
     // Player arrow.
     const [px, py] = toMap(playerPos.x, playerPos.z);
@@ -70,22 +97,47 @@ export function createHud() {
     ctx.restore();
   }
 
+  /** Flash a short message above the minimap (pickup, bust, mute, ...). */
+  function showToast(text, ms = 2600) {
+    if (!els.toast) return;
+    els.toast.textContent = text;
+    els.toast.style.display = 'block';
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { els.toast.style.display = 'none'; }, ms);
+  }
+
+  /** Show / hide the jobs (mission list) panel. */
+  function toggleMissionList(text) {
+    if (!els.missionList) return false;
+    const showing = els.missionList.style.display !== 'block';
+    els.missionList.style.display = showing ? 'block' : 'none';
+    if (showing) els.missionList.textContent = text;
+    return showing;
+  }
+
   function update(state) {
-    els.healthFill.style.width = state.health + '%';
+    els.healthFill.style.width = Math.max(0, state.health) + '%';
     els.healthText.textContent = Math.round(state.health);
     els.money.textContent = '$' + state.money.toLocaleString('en-US');
-    els.wanted.textContent = '★'.repeat(state.wanted) + '☆'.repeat(5 - state.wanted);
+    // Wanted: up to 3 stars shine red-hot, the rest stay empty.
+    const stars = '★'.repeat(state.wanted) + '☆'.repeat(5 - state.wanted);
+    els.wanted.textContent = stars;
+    els.wanted.style.color = state.wanted > 0 ? '#ff5a5a' : '#ffd23f';
     els.objective.textContent = state.objective;
     els.speed.textContent = state.inCar
       ? Math.round(Math.abs(state.speed) * 3.6) + ' km/h'
       : '';
     els.hint.textContent = state.inCar
-      ? 'WASD drive · E exit car · P pause'
-      : (state.nearCar ? 'E — take the car' : 'WASD move · Shift run · Space jump · E enter car · P pause');
-    drawMinimap(state.playerPos, state.heading, state.cars, state.inCar, state.objectivePos);
+      ? 'WASD drive · E exit car · F punch · M mute · J jobs · P pause'
+      : (state.nearCar ? 'E — take the car · F punch · M mute · J jobs' : 'WASD move · Shift run · Space jump · E enter car · F punch · M mute · J jobs · P pause');
+    drawMinimap(state.playerPos, state.heading, state.cars, state.inCar, state.objectivePos, {
+      traffic: state.traffic || [],
+      police: state.police || [],
+      peds: state.peds || [],
+    });
   }
 
-  return { update };
+  return { update, showToast, toggleMissionList };
 }
 
 /** Show or hide the start screen / pause menu overlays. */

@@ -1,4 +1,8 @@
 // Solmar City — the program that hands the game in (Node 22, stdlib only).
+// Phase 2: the game now ships traffic, pedestrians, police/wanted, three
+// story missions, melee combat, procedural audio and saves alongside the
+// Phase 1 city, driving and HUD. This program is unchanged in shape: it
+// copies game/ and screenshots/ and writes the dossier the judge reads.
 //
 // The game is plain static files under this directory's game/ folder: a
 // three.js open-world crime game (game/index.html plus its ES modules, no

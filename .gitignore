@@ -1,1 +1,3 @@
 out/
+# Phase 2: local playtest output and per-shot browser profiles stay out of git.
+work-tmp/

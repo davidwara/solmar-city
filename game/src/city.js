@@ -82,7 +82,7 @@ function makePalm(rng) {
 export function buildCity(scene, seed) {
   const rng = createRng(seed);
   const colliders = []; // {minX,maxX,minZ,maxZ}
-  const landmarks = { downtown: new THREE.Vector3(0, 0, 0), beach: new THREE.Vector3(0, 0, 235), marina: new THREE.Vector3(-150, 0, 225) };
+  const landmarks = { downtown: new THREE.Vector3(0, 0, 0), beach: new THREE.Vector3(0, 0, 235), marina: new THREE.Vector3(-150, 0, 225), docks: new THREE.Vector3(150, 0, 186), safehouse: new THREE.Vector3(124, 0, 200), drop: new THREE.Vector3(62, 0, -62) };
 
   // --- lights & sky -------------------------------------------------------
   const hemi = new THREE.HemisphereLight(0xbfd9ff, 0x8a7a5a, 0.95);
@@ -276,4 +276,31 @@ export function setTimeOfDay(scene, city, t) {
   city.sun.color.setHex(t > 0.6 ? 0xffb36b : 0xffe6b0);
   city.sun.intensity = 2.1 - 0.7 * t;
   city.hemi.intensity = 0.95 - 0.35 * t;
+}
+
+// --- Phase 2 helpers: road + sidewalk points for traffic and pedestrians ---
+
+/** A random point on a road centreline, with the driving direction along it. */
+export function randomRoadPoint(rng) {
+  const street = pick(rng, CITY.streets);
+  const along = rand(rng, -180, 180);
+  if (rng() < 0.5) return { x: street, z: along, axis: 'ns', dir: rng() < 0.5 ? 1 : -1 };
+  return { x: along, z: street, axis: 'ew', dir: rng() < 0.5 ? 1 : -1 };
+}
+
+/** A random point on a sidewalk beside a road (roads are 14 wide, so the
+ *  sidewalk sits ~10.5 from the centreline). Pedestrians walk here. */
+export function randomSidewalkPoint(rng) {
+  const street = pick(rng, CITY.streets);
+  const along = rand(rng, -185, 185);
+  const side = rng() < 0.5 ? -10.5 : 10.5;
+  if (rng() < 0.5) return { x: street + side, z: along };
+  return { x: along, z: street + side };
+}
+
+/** Nearest street centreline coordinate to a value (for snapping turns). */
+export function nearestStreet(v) {
+  let best = CITY.streets[0];
+  for (const s of CITY.streets) if (Math.abs(s - v) < Math.abs(best - v)) best = s;
+  return best;
 }

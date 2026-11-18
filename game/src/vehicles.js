@@ -117,3 +117,27 @@ export function nearestCar(cars, pos, maxDist) {
   }
   return best;
 }
+
+/** Red/blue emergency light bar for a police car roof. Returns the two
+ *  lamp meshes so police.js can flash them alternately. */
+export function addLightBar(group) {
+  const bar = new THREE.Mesh(
+    new THREE.BoxGeometry(1.1, 0.16, 0.4),
+    new THREE.MeshLambertMaterial({ color: 0x111111 }),
+  );
+  bar.position.set(0, 1.52, -0.25);
+  group.add(bar);
+  const red = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.18, 0.42),
+    new THREE.MeshBasicMaterial({ color: 0xff2222 }),
+  );
+  red.position.set(-0.28, 1.56, -0.25);
+  group.add(red);
+  const blue = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.18, 0.42),
+    new THREE.MeshBasicMaterial({ color: 0x2266ff }),
+  );
+  blue.position.set(0.28, 1.56, -0.25);
+  group.add(blue);
+  return { red, blue };
+}

@@ -32,8 +32,16 @@
   #health-label { font-size: 13px; letter-spacing: 2px; color: #ffd9de; text-shadow: 0 1px 3px #000; }
   #health-bar { height: 14px; background: rgba(0,0,0,0.55); border: 1px solid #fff; border-radius: 7px; overflow: hidden; }
   #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff4d6d, #ff8a5c); }
-  #objective { position: absolute; top: 64px; left: 16px; font-size: 15px; color: #fff;
+  #objective { position: absolute; top: 64px; left: 16px; max-width: 560px; font-size: 15px; color: #fff;
     background: rgba(0,0,0,0.45); padding: 7px 12px; border-left: 4px solid #ffd23f; border-radius: 4px; }
+  #toast { position: absolute; top: 118px; left: 50%; transform: translateX(-50%); display: none;
+    font-size: 16px; font-weight: bold; color: #ffd23f; background: rgba(0,0,0,0.6);
+    padding: 8px 18px; border-radius: 20px; white-space: nowrap; text-shadow: 0 1px 3px #000; }
+  #mission-list { position: absolute; top: 118px; left: 16px; display: none; white-space: pre-line;
+    font-size: 14px; line-height: 1.7; color: #e8f4ff; background: rgba(0,0,0,0.65);
+    padding: 12px 16px; border: 1px solid #ffd23f; border-radius: 8px; }
+  #mute-tag { position: absolute; top: 14px; left: 250px; font-size: 13px; letter-spacing: 2px;
+    color: rgba(255,255,255,0.7); text-shadow: 0 1px 3px #000; }
   #speed { position: absolute; bottom: 54px; right: 18px; font-size: 26px; font-weight: bold;
     color: #fff; text-shadow: 0 2px 4px #000; }
   #hint { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); font-size: 14px;
@@ -56,6 +64,9 @@
     <div id="health-bar"><div id="health-fill"></div></div>
   </div>
   <div id="objective">Meet Rico at the marina — drive south to the pier</div>
+  <div id="toast"></div>
+  <div id="mission-list"></div>
+  <div id="mute-tag"></div>
   <div id="top-right">
     <div id="money">$1,250</div>
     <div id="wanted">☆☆☆☆☆</div>
@@ -72,14 +83,18 @@
     <h2>AN OPEN-WORLD CRIME STORY</h2>
     <p>You are <b>Mara Voss</b>, a courier pulled into the Solmar underworld.
     Explore the sun-soaked coastal city on foot or behind the wheel —
-    steal a car, cruise the beachfront, and meet Rico at the marina.</p>
+    steal a car, cruise the beachfront, dodge the law, and run three jobs
+    for Rico — the streets, the traffic and the police are all live.</p>
     <div class="controls">
       <b>WASD</b> move / drive &nbsp;·&nbsp; <b>Mouse drag</b> look around<br>
       <b>Shift</b> run &nbsp;·&nbsp; <b>Space</b> jump &nbsp;·&nbsp; <b>E</b> enter / exit car<br>
+      <b>F</b> punch &nbsp;·&nbsp; <b>M</b> mute &nbsp;·&nbsp; <b>J</b> jobs &nbsp;·&nbsp; <b>R</b> retry job<br>
       <b>P</b> pause &nbsp;·&nbsp; <b>Wheel</b> zoom camera
     </div>
     <br>
     <button id="start-button">START ENGINE</button>
+    <button id="continue-button" style="display:none; margin-left: 10px;">CONTINUE</button>
+    <p id="save-note" style="display:none; font-size: 13px; color: #9fd4a8;"></p>
   </div>
 </div>
 
