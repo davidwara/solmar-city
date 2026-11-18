@@ -406,6 +406,22 @@ export function createMissions(scene) {
     }).join('\n');
   }
 
+  /**
+   * Phase 6: the side-hustle lines under the job list — fishing, races,
+   * courier runs, casino ledger and safehouses, one line each, so the J
+   * panel shows the whole of Mara's working life, not just Rico's jobs.
+   */
+  function sideJobsText(s) {
+    const lines = ['— Side hustles —'];
+    if (s.fishing) lines.push(`Fishing: ${s.fishing.fishCaught} caught · $${s.fishing.cashEarned} earned`);
+    if (s.races) lines.push(`Races: ${s.races.wins} won · best ${Object.keys(s.races.best).length}/3 routes`);
+    if (s.delivery) lines.push(`Courier: ${s.delivery.jobsDone} delivered · $${s.delivery.tipsEarned} in tips`);
+    if (s.casino) lines.push(`Casino: won $${s.casino.won} · lost $${s.casino.lost}`);
+    if (s.housing) lines.push(`Safehouses: ${s.housing.ownedCount()}/3 owned`);
+    if (s.pets) lines.push(`Biscuit: ${s.pets.snacksGiven} snacks · ${s.pets.packagesFound} packages sniffed out`);
+    return lines.join('\n');
+  }
+
   /** Stage the Smuggler's Run mid-delivery (screenshot pose): crate
    *  aboard, roadblocks up, beacon on the docks drop. */
   function armSmugglerDelivery() {
@@ -630,6 +646,7 @@ export function createMissions(scene) {
   missions.restartCurrent = restartCurrent;
   missions.objectiveText = objectiveText;
   missions.listText = listText;
+  missions.sideJobsText = sideJobsText;
   missions.update = update;
   missions.snapPhoto = snapPhoto;
   missions.armSmugglerDelivery = armSmugglerDelivery;

@@ -16,6 +16,10 @@ export const BAY = {
   maxZ: 470,
 };
 
+// Phase 6: the Marina Market stall on the west dock — the third courier
+// depot, where parcels change hands beside the moored boats.
+export const MARINA_MARKET_POS = { x: -150, z: 240 };
+
 // Where a boat is moored when nobody is driving it.
 const MOORINGS = [
   { x: -168, z: 282, heading: 0.4, color: 0xe8e8e8, name: 'Gull' },

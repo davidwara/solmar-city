@@ -67,6 +67,15 @@ export function setPunch(player) {
   player.punchTimer = 0.35;
 }
 
+/**
+ * Phase 6: turn Mara to face a point — fishing uses it so she faces the
+ * water when she casts, instead of casting over her shoulder.
+ */
+export function faceToward(player, x, z) {
+  player.heading = Math.atan2(x - player.pos.x, z - player.pos.z);
+  player.group.rotation.y = player.heading;
+}
+
 /** Push a circle (x,z,radius) out of every building AABB it overlaps. */
 export function resolveCollisions(pos, radius, colliders) {
   for (const c of colliders) {

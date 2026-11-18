@@ -135,6 +135,16 @@ export function createWeather(scene, city, daynight) {
     return 1 - 0.24 * weather.rainLevel;
   }
 
+  /**
+   * Phase 6: the sea breeze off the bay, 0 (calm) to 1 (storm) — the
+   * fishing bobber drifts on it, and the pier feels it before the city.
+   */
+  function seaBreeze() {
+    if (weather.mode === 'storm') return 1;
+    if (weather.mode === 'rain') return 0.7;
+    return 0.3;
+  }
+
   function iconText() {
     return WEATHER_ICON[weather.mode];
   }
@@ -207,6 +217,7 @@ export function createWeather(scene, city, daynight) {
   weather.setMode = setMode;
   weather.flashNow = flashNow;
   weather.gripFactor = gripFactor;
+  weather.seaBreeze = seaBreeze;
   weather.iconText = iconText;
   weather.update = update;
   weather.updateRainRipples = updateRainRipples;

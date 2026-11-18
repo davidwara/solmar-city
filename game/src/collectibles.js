@@ -92,6 +92,21 @@ export function createCollectibles(scene, seed) {
     return out;
   }
 
+  /**
+   * Phase 6: the nearest package still out there, anywhere on the map —
+   * Biscuit's nose. Null when the set is complete.
+   */
+  function nearestPackage(pos) {
+    let best = null;
+    let bestD = Infinity;
+    for (const it of items) {
+      if (it.taken) continue;
+      const d = Math.hypot(it.pos.x - pos.x, it.pos.z - pos.z);
+      if (d < bestD) { bestD = d; best = it.pos; }
+    }
+    return best;
+  }
+
   /** Move one package to a spot (screenshot poses stage a grab in frame). */
   function stageOne(x, z) {
     const it = items.find((p) => !p.taken);
@@ -142,6 +157,7 @@ export function createCollectibles(scene, seed) {
 
   collectibles.counterText = counterText;
   collectibles.nearby = nearby;
+  collectibles.nearestPackage = nearestPackage;
   collectibles.stageOne = stageOne;
   collectibles.restore = restore;
   collectibles.update = update;

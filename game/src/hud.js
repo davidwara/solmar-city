@@ -5,7 +5,7 @@
 // Phase 3 adds the pistol ammo counter, the day/night clock, a flashing
 // wanted display, and gun-shop + bodyguard-client markers on the minimap.
 import { CITY } from './city.js';
-import { clamp01 } from './utils.js';
+import { clamp01, formatMoney } from './utils.js';
 
 const STREETS = CITY.streets;
 
@@ -28,6 +28,7 @@ export function createHud() {
     station: document.getElementById('station'),
     flash: document.getElementById('flash'),
     turf: document.getElementById('turf'),
+    sideLine: document.getElementById('side-line'),
   };
   const ctx = els.minimap.getContext('2d');
   const S = els.minimap.width; // 190
@@ -160,6 +161,24 @@ export function createHud() {
       ctx.fillStyle = '#7df9ff';
       ctx.beginPath(); ctx.arc(gx, gy, 3, 0, Math.PI * 2); ctx.fill();
     }
+    // Phase 6 markers: the pier, race flag + next gate, safehouse doors,
+    // the casino, courier depots + drop, and Biscuit's brown dot.
+    for (const m of extra.phase6 || []) {
+      const [mx, my] = toMap(m.x, m.z);
+      ctx.fillStyle = m.color;
+      if (m.shape === 'diamond') {
+        ctx.beginPath();
+        ctx.moveTo(mx, my - m.r); ctx.lineTo(mx + m.r * 0.8, my); ctx.lineTo(mx, my + m.r); ctx.lineTo(mx - m.r * 0.8, my);
+        ctx.closePath(); ctx.fill();
+      } else if (m.shape === 'flag') {
+        ctx.fillRect(mx - 1, my - m.r - 2, 2, m.r * 2 + 2);
+        ctx.fillRect(mx + 1, my - m.r - 2, m.r, m.r * 0.6);
+      } else if (m.shape === 'square') {
+        ctx.fillRect(mx - m.r, my - m.r, m.r * 2, m.r * 2);
+      } else {
+        ctx.beginPath(); ctx.arc(mx, my, m.r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
     // Player arrow.
     const [px, py] = toMap(playerPos.x, playerPos.z);
     ctx.save();
@@ -200,7 +219,7 @@ export function createHud() {
   function update(state) {
     els.healthFill.style.width = Math.max(0, state.health) + '%';
     els.healthText.textContent = Math.round(state.health);
-    els.money.textContent = '$' + state.money.toLocaleString('en-US');
+    els.money.textContent = formatMoney(state.money);
     // Wanted: up to 3 stars shine red-hot, the rest stay empty. While the
     // law is on Mara the whole row pulses so it cannot be missed.
     const stars = '★'.repeat(state.wanted) + '☆'.repeat(5 - state.wanted);
@@ -220,17 +239,20 @@ export function createHud() {
     if (els.station) els.station.textContent = state.inCar ? (state.stationText || '') : '';
     // Phase 5 readouts: turf owned, and boat speed on the water.
     if (els.turf) els.turf.textContent = state.turfText || '';
+    // Phase 6 readout: the side-hustle line (fishing, race, courier,
+    // casino, safehouse, Biscuit) under the counters.
+    if (els.sideLine) els.sideLine.textContent = state.sideText || '';
     els.objective.textContent = state.objective;
     els.speed.textContent = state.inCar
       ? Math.round(Math.abs(state.speed) * 3.6) + ' km/h'
       : state.inBoat
         ? Math.round(state.boatSpeed || 0) + ' km/h · BOAT'
         : '';
-    els.hint.textContent = state.inCar
+    els.hint.textContent = state.phase6Hint || (state.inCar
       ? 'WASD drive · E exit car · F punch · M mute · J jobs · P pause'
       : state.inBoat
         ? 'WASD sail · E step ashore · M mute · J jobs · P pause'
-        : (state.nearBoat ? 'E — board the boat · F punch · Click shoot · R reload · M mute · J jobs' : state.nearGarage ? 'G — Solmar Garage: paint, engine & armour · WASD move · Shift run · Space jump · F punch · M mute · J jobs · P pause' : state.nearCar ? 'E — take the car · F punch · Click shoot · R reload · M mute · J jobs' : state.nearShop ? 'G — buy pistol $400 · WASD move · Shift run · Space jump · F punch · M mute · J jobs · P pause' : 'WASD move · Shift run · Space jump · E enter car · F punch · Click shoot · M mute · J jobs · P pause');
+        : (state.nearBoat ? 'E — board the boat · F punch · Click shoot · R reload · M mute · J jobs' : state.nearGarage ? 'G — Solmar Garage: paint, engine & armour · WASD move · Shift run · Space jump · F punch · M mute · J jobs · P pause' : state.nearCar ? 'E — take the car · F punch · Click shoot · R reload · M mute · J jobs' : state.nearShop ? 'G — buy pistol $400 · WASD move · Shift run · Space jump · F punch · M mute · J jobs · P pause' : 'WASD move · Shift run · Space jump · E enter car · F punch · Click shoot · M mute · J jobs · P pause'));
     drawMinimap(state.playerPos, state.heading, state.cars, state.inCar, state.objectivePos, {
       traffic: state.traffic || [],
       police: state.police || [],
@@ -244,6 +266,7 @@ export function createHud() {
       turfZones: state.turfZones || [],
       boats: state.boats || [],
       garagePos: state.garagePos || null,
+      phase6: state.phase6Markers || [],
     });
   }
 

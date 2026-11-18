@@ -72,3 +72,21 @@ export function angleDiff(a, b) {
   if (d < -Math.PI) d += Math.PI * 2;
   return d;
 }
+
+/**
+ * Phase 6: clamp any angle to [-PI, PI] in one call — Biscuit's heading
+ * and the race gates use it so a turn never spins the long way round.
+ */
+export function clampAngle(a) {
+  return angleDiff(0, a);
+}
+
+/**
+ * Phase 6: money as "$1,250" everywhere — the HUD, the casino and the
+ * hospital bill all format through this one helper now.
+ */
+export function formatMoney(n) {
+  const v = Math.round(n || 0);
+  const sign = v < 0 ? '-' : '';
+  return sign + '$' + Math.abs(v).toLocaleString('en-US');
+}

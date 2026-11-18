@@ -27,6 +27,13 @@ export function loadSave() {
       paintIndex: typeof data.paintIndex === 'number' ? data.paintIndex : -1,
       engineLevel: typeof data.engineLevel === 'number' ? data.engineLevel : 0,
       armor: data.armor === true,
+      // Phase 6: fishing, races, safehouses, casino, courier, Biscuit.
+      fishing: data.fishing && typeof data.fishing === 'object' ? data.fishing : null,
+      races: data.races && typeof data.races === 'object' ? data.races : null,
+      housing: data.housing && typeof data.housing === 'object' ? data.housing : null,
+      casino: data.casino && typeof data.casino === 'object' ? data.casino : null,
+      delivery: data.delivery && typeof data.delivery === 'object' ? data.delivery : null,
+      pets: data.pets && typeof data.pets === 'object' ? data.pets : null,
     };
   } catch {
     return null;
@@ -51,6 +58,12 @@ export function saveGame(data) {
       paintIndex: typeof data.paintIndex === 'number' ? data.paintIndex : -1,
       engineLevel: typeof data.engineLevel === 'number' ? data.engineLevel : 0,
       armor: data.armor === true,
+      fishing: data.fishing || null,
+      races: data.races || null,
+      housing: data.housing || null,
+      casino: data.casino || null,
+      delivery: data.delivery || null,
+      pets: data.pets || null,
     }));
     return true;
   } catch {

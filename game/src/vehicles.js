@@ -150,3 +150,28 @@ export function addLightBar(group) {
   group.add(blue);
   return { red, blue };
 }
+
+/**
+ * Phase 6: bolt a rear spoiler onto a car group — the mark of a street
+ * racer. Races add it the first time Mara lines up at the garage flag;
+ * it stays on the car for good.
+ */
+export function addSpoiler(group) {
+  if (!group || group.userData.spoiler) return false;
+  const blade = new THREE.Mesh(
+    new THREE.BoxGeometry(1.7, 0.1, 0.45),
+    new THREE.MeshLambertMaterial({ color: 0x1c1f24 }),
+  );
+  blade.position.set(0, 1.35, -1.95);
+  group.add(blade);
+  for (const sx of [-0.6, 0.6]) {
+    const strut = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.35, 0.1),
+      new THREE.MeshLambertMaterial({ color: 0x1c1f24 }),
+    );
+    strut.position.set(sx, 1.15, -1.95);
+    group.add(strut);
+  }
+  group.userData.spoiler = true;
+  return true;
+}

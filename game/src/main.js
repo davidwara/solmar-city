@@ -27,7 +27,7 @@ import { createAudio } from './audio.js';
 import { loadSave, saveGame, hasSave, clearSave } from './save.js';
 import { createHud, showScreen } from './hud.js';
 import { stageShot, SHOT_NAMES } from './shots.js';
-import { createWeapons, GUN_PRICE } from './weapons.js';
+import { createWeapons, GUN_PRICE, BAT_PRICE } from './weapons.js';
 import { createDayNight } from './daynight.js';
 import { createWasted, HOSPITAL_POS } from './wasted.js';
 import { createWeather } from './weather.js';
@@ -37,6 +37,16 @@ import { buildIsland, ISLAND_BOUNDS, ISLAND_DOCK, LIGHTHOUSE_POS } from './islan
 import { createGangs } from './gangs.js';
 import { createCustomization, ARMOR_BONUS } from './customization.js';
 import { createStory, STORY_JOBS } from './story.js';
+// Phase 6: the side hustles — fishing, street races, safehouses, the
+// casino, courier runs, and Biscuit the stray dog.
+import { createFishing, PIER_TIP, FISH_PRICES } from './fishing.js';
+import { createRaces, RACE_ROUTES } from './races.js';
+import { createHousing } from './housing.js';
+import { createCasino } from './casino.js';
+import { createDelivery } from './delivery.js';
+import { createPets, SNACK_PRICE } from './pets.js';
+import { faceToward } from './player.js';
+import { formatMoney } from './utils.js';
 
 const params = new URLSearchParams(window.location.search);
 const shotName = params.get('shot');
@@ -92,6 +102,15 @@ for (const c of island.colliders) city.colliders.push(c);
 missions.setLighthouseHook(() => island.lightOn());
 missions.setTurfHook(() => gangs.rivalsAliveIn('sharks'));
 
+// Phase 6: the side hustles. Fishing and the casino need the audio
+// system; Biscuit needs the packages and the gangs to sniff and bark at.
+const fishing = createFishing(scene, audio);
+const races = createRaces(scene);
+const housing = createHousing(scene);
+const casino = createCasino(scene, audio);
+const delivery = createDelivery(scene);
+const pets = createPets(scene, audio, collectibles, gangs);
+
 // --- game state ------------------------------------------------------------
 const savedGame = loadSave();
 const state = {
@@ -116,6 +135,7 @@ const state = {
   cameraMode: 'chase', // chase | fixed
   fixedCam: null,
   saveTimer: 0,
+  playTime: 0, // Phase 6: seconds played — Biscuit waits 15s before hello
 };
 const crashCooldown = { value: 0 };
 
@@ -146,6 +166,12 @@ function persistSave() {
     paintIndex: customization.state.paintIndex,
     engineLevel: customization.state.engineLevel,
     armor: customization.state.armor,
+    fishing: fishing.saveData(),
+    races: races.saveData(),
+    housing: housing.saveData(),
+    casino: casino.saveData(),
+    delivery: delivery.saveData(),
+    pets: pets.saveData(),
   });
 }
 
@@ -184,6 +210,12 @@ function startGame(useSave) {
     collectibles.restore(savedGame.packagesCollected || 0);
     customization.restore(savedGame);
     gangs.restore(savedGame.turfOwned);
+    fishing.restore(savedGame.fishing);
+    races.restore(savedGame.races);
+    housing.restore(savedGame.housing);
+    casino.restore(savedGame.casino);
+    delivery.restore(savedGame.delivery);
+    pets.restore(savedGame.pets);
     if (customization.state.armor) state.maxHealth = 100 + ARMOR_BONUS;
     missions.startMission(Math.min(savedGame.missionsCompleted, 11));
     maybeStartNight();
@@ -217,7 +249,10 @@ function handleBusted() {
 
 function handleWasted() {
   if (state.mode === 'wasted') return;
-  const bill = wasted.hospitalBill(state.money);
+  // Phase 6: the itemised hospital bill — bed + treatment, and the wake-up
+  // point is home when Mara owns a safehouse she has slept in.
+  const parts = wasted.billBreakdown(state.money);
+  const bill = parts.total;
   state.money = Math.max(0, state.money - bill);
   police.setWanted(0, player.pos);
   if (state.car) exitCar(true);
@@ -225,11 +260,17 @@ function handleWasted() {
   state.mode = 'wasted';
   audio.thud();
   wasted.showWasted(() => {
-    player.pos.set(HOSPITAL_POS.x, 0, HOSPITAL_POS.z);
+    const home = housing.respawnPoint();
+    if (home) {
+      player.pos.set(home.x, 0, home.z);
+      toast(`WASTED! Bed $${parts.bed} + treatment $${parts.treatment} = $${bill} — you wake up at home.`);
+    } else {
+      player.pos.set(HOSPITAL_POS.x, 0, HOSPITAL_POS.z);
+      toast(`WASTED! St. Solmar patched you up — bed $${parts.bed} + treatment $${parts.treatment} = $${bill}.`);
+    }
     player.group.position.copy(player.pos);
     state.health = state.maxHealth;
     state.mode = 'playing';
-    toast(`WASTED! St. Solmar patched you up — $${bill}.`);
     persistSave();
   });
 }
@@ -273,10 +314,83 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (KEYMAP[e.code]) input[KEYMAP[e.code]] = true;
-  if (e.code === 'KeyE' && !e.repeat && state.mode === 'playing') toggleCar();
+  if (e.code === 'KeyE' && !e.repeat && state.mode === 'playing') {
+    // Phase 6 on-foot errands come before the car: step out of a
+    // safehouse, buy or enter a house, take a courier parcel, or sell
+    // the fishing bucket at the pier. In a car or boat, E still exits.
+    if (!state.inCar && !state.inBoat) {
+      if (housing.inside) {
+        const out = housing.exit();
+        if (out) {
+          player.pos.set(out.x, 0, out.z);
+          player.group.position.copy(player.pos);
+          toast(`Stepped out of the ${out.name} — the street again.`);
+        }
+        return;
+      }
+      const house = housing.doorAt(player.pos);
+      if (house) {
+        if (housing.isOwned(house)) {
+          const room = housing.enter(player.pos);
+          if (room) {
+            player.pos.set(room.x, 0, room.z);
+            player.group.position.copy(player.pos);
+            toast(`Home — the ${room.name}. Wake up here from now on.`);
+            persistSave();
+          }
+        } else if (state.money >= house.price) {
+          const paid = housing.buy(house, state.money);
+          if (paid > 0) {
+            state.money -= paid;
+            audio.jingle();
+            toast(`The ${house.name} is yours — ${formatMoney(paid)}. Press E again to step inside.`);
+            persistSave();
+          }
+        } else {
+          toast(`The ${house.name} costs ${formatMoney(house.price)} — save up.`);
+        }
+        return;
+      }
+      if (delivery.nearDepot(player.pos)) {
+        const job = delivery.pickup(player.pos);
+        if (job) {
+          audio.chime();
+          toast(`Parcel picked up — deliver to ${job.drop.label} in ${job.timeTotal}s.`);
+        } else {
+          toast('Finish the parcel you are carrying first.');
+        }
+        return;
+      }
+      if (fishing.nearPier(player.pos) && fishing.bucket.length > 0) {
+        const cash = fishing.sell(player.pos);
+        if (cash > 0) {
+          state.money += cash;
+          toast(`Sold the bucket — +${formatMoney(cash)}.`);
+          persistSave();
+        }
+        return;
+      }
+    }
+    toggleCar();
+  }
   if ((e.code === 'KeyP' || e.code === 'Escape') && !e.repeat) togglePause();
   if (e.code === 'Enter' && state.mode === 'menu') startGame(false);
   if (e.code === 'KeyF' && !e.repeat && state.mode === 'playing' && !state.inCar && !state.inBoat) {
+    // Fishing first: on the pier, F casts the line and reels a bite in
+    // instead of punching — face the water, then fish.
+    if (fishing.nearPier(player.pos)) {
+      if (fishing.state === 'bite') {
+        const caught = fishing.reel();
+        if (caught) toast(`Caught a ${caught} — worth ${formatMoney(FISH_PRICES[caught])}. E at the pier sells the bucket.`);
+        return;
+      }
+      if (fishing.state === 'idle') {
+        faceToward(player, PIER_TIP.x, PIER_TIP.z);
+        if (fishing.cast(player.pos)) toast('Line cast — wait for the bobber to dip…');
+        return;
+      }
+      return; // waiting for a bite — F does nothing until it dips
+    }
     // A rival gang member up close goes down first — turf war business.
     const rival = gangs.nearestRival(player.pos, 2.4);
     if (rival) {
@@ -285,11 +399,11 @@ window.addEventListener('keydown', (e) => {
       toast('Rival down! The turf notices.');
       return;
     }
-    const hit = combat.tryPunch(player, peds);
+    const hit = combat.tryPunch(player, peds, weapons.meleeReach());
     if (hit) {
       police.addHeat(1, player.pos);
       audio.thud();
-      toast('You laid out a pedestrian — the law noticed! +1★');
+      toast(weapons.bat ? 'You laid out a pedestrian with the bat — the law noticed! +1★' : 'You laid out a pedestrian — the law noticed! +1★');
     }
   }
   if (e.code === 'KeyM' && !e.repeat) {
@@ -300,7 +414,7 @@ window.addEventListener('keydown', (e) => {
     toast(muted ? 'Sound off' : 'Sound on');
   }
   if (e.code === 'KeyJ' && !e.repeat && state.mode === 'playing') {
-    hud.toggleMissionList(missions.listText());
+    hud.toggleMissionList(missions.listText() + '\n' + missions.sideJobsText({ fishing, races, delivery, casino, housing, pets }));
   }
   if (e.code === 'KeyR' && !e.repeat && state.mode === 'playing') {
     // R reloads the pistol when it can; otherwise it retries the job.
@@ -314,6 +428,15 @@ window.addEventListener('keydown', (e) => {
     }
   }
   if (e.code === 'KeyG' && !e.repeat && state.mode === 'playing' && !state.inCar && !state.inBoat) {
+    // The casino door first: G pulls the slot lever at the Golden Gull.
+    if (casino.nearCasino(player.pos)) {
+      const spin = casino.slots(state.money);
+      if (!spin.ok) { toast(spin.text); return; }
+      state.money += spin.delta;
+      toast(spin.text);
+      persistSave();
+      return;
+    }
     // The garage comes first when Mara stands on its lot; otherwise the
     // gun shop — same key, whichever business she is standing in.
     if (customization.nearGarage(player.pos)) {
@@ -332,10 +455,72 @@ window.addEventListener('keydown', (e) => {
       toast('Pistol bought — click to shoot, R to reload.');
       persistSave();
     } else if (res === 'owned') {
-      toast('You already own the pistol.');
+      // Pistol already hers — the same shop sells the $50 bat instead.
+      if (!weapons.bat) {
+        const batRes = weapons.buyBat(state.money);
+        if (batRes === 'ok') {
+          state.money -= BAT_PRICE;
+          audio.chime();
+          toast('Bat bought — F swings farther now, and it never needs ammo.');
+          persistSave();
+        } else {
+          toast('You already own the pistol. The bat is $50.');
+        }
+      } else {
+        toast('You already own the pistol — and the bat.');
+      }
     } else {
       toast('Not enough cash — the pistol is $400.');
     }
+  }
+  if (e.code === 'KeyT' && !e.repeat && state.mode === 'playing' && state.inCar && state.car) {
+    // Street race: line up at the chequered flag by the garage. The next
+    // route without a best time runs first; once all three have a best,
+    // T runs the Harbour Sprint again for a faster time.
+    if (races.active) { toast('A race is already running — finish it first.'); return; }
+    if (!races.nearStart(state.car.pos)) { toast('Races start at the chequered flag by the Solmar Garage.'); return; }
+    const next = RACE_ROUTES.findIndex((r) => races.best[r.name] === undefined);
+    const idx = next === -1 ? 0 : next;
+    if (races.start(idx, state.car)) {
+      audio.jingle();
+      toast(`${RACE_ROUTES[idx].name} — ${formatMoney(RACE_ROUTES[idx].prize)} to the winner. 3… 2… 1…`);
+    }
+  }
+  if (e.code === 'KeyH' && !e.repeat && state.mode === 'playing' && !state.inCar && !state.inBoat) {
+    // Biscuit's snack: $10, and a happy dog walks closer.
+    if (pets.feed(state.money)) {
+      state.money -= SNACK_PRICE;
+      toast('Biscuit scarfs the snack — tail wagging.');
+      persistSave();
+    } else {
+      toast('A snack costs $10 — Biscuit waits.');
+    }
+  }
+  if (e.code === 'KeyV' && !e.repeat && state.mode === 'playing' && !state.inCar && !state.inBoat) {
+    // Biscuit, find a package: he runs toward the nearest one still out.
+    if (pets.point(player.pos)) toast(pets.lastPoint);
+    else toast(pets.lastPoint || 'Biscuit sniffs the air — nothing left to find.');
+  }
+  if (e.code === 'KeyU' && !e.repeat && state.mode === 'playing' && casino.hiLo) {
+    // Card table: the next card is HIGHER than the one showing.
+    const g = casino.guessHiLo(true);
+    state.money += g.delta;
+    toast(g.text);
+    if (g.done) persistSave();
+  }
+  if (e.code === 'KeyI' && !e.repeat && state.mode === 'playing' && casino.hiLo) {
+    // Card table: the next card is LOWER than the one showing.
+    const g = casino.guessHiLo(false);
+    state.money += g.delta;
+    toast(g.text);
+    if (g.done) persistSave();
+  }
+  if (e.code === 'KeyX' && !e.repeat && state.mode === 'playing' && casino.hiLo) {
+    // Card table: walk away with the pot as it stands.
+    const out = casino.cashOut();
+    state.money += out.delta;
+    toast(out.text);
+    persistSave();
   }
   if (e.code === 'KeyQ' && !e.repeat && state.mode === 'playing') {
     // Radio: only while driving — on foot the streets are the soundtrack.
@@ -347,6 +532,15 @@ window.addEventListener('keydown', (e) => {
     toast(station ? `Radio: ${station}` : 'Radio off');
   }
   if (e.code === 'KeyC' && !e.repeat && state.mode === 'playing') {
+    // The card table first: C sits Mara down at the Golden Gull.
+    if (casino.nearCasino(player.pos) && !state.inCar && !state.inBoat) {
+      const seated = casino.startHiLo(state.money);
+      if (!seated.ok) { toast(seated.text); return; }
+      state.money += seated.delta;
+      toast(seated.text);
+      persistSave();
+      return;
+    }
     // Shutterbug: snap the scenic spot when Mara is close enough.
     const m = missions.current();
     if (!m || m.kind !== 'shutterbug') return;
@@ -547,6 +741,12 @@ if (isShot) {
     gangs,
     customization,
     story,
+    fishing,
+    races,
+    housing,
+    casino,
+    delivery,
+    pets,
   });
   if (shotName === 'menu') {
     // Menu pose keeps the start screen visible over a sunset vista.
@@ -594,7 +794,7 @@ document.getElementById('restart-button').addEventListener('click', () => {
 });
 
 // Debug handle for headless probes (CDP): window.__solmar.
-window.__solmar = { state, missions, police, traffic, peds, player, cars, weapons, daynight, wasted, weather, collectibles, boats, island, gangs, customization, story };
+window.__solmar = { state, missions, police, traffic, peds, player, cars, weapons, daynight, wasted, weather, collectibles, boats, island, gangs, customization, story, fishing, races, housing, casino, delivery, pets };
 
 // --- main loop ---------------------------------------------------------------
 const clock = new THREE.Clock();
@@ -603,6 +803,7 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.05);
   try {
     if (state.mode === 'playing') {
+      state.playTime += dt;
       // Screenshot poses hold the throttle so the drive shot stays in motion.
       if (isShot && shotName === 'drive') input.forward = true;
       // Day/night clock runs in play (frozen for screenshot poses, whose
@@ -757,6 +958,40 @@ function frame() {
         persistSave();
       }
 
+      // --- Phase 6: side hustles -------------------------------------------
+      // Fishing: the bobber, the bite window, the golden-hour Koi.
+      fishing.update(dt, { playerPos: player.pos, goldenHour: daynight.isGoldenHour(), seaBreeze: weather.seaBreeze() });
+      // Street races: countdown calls, gate calls, and the prize.
+      const raceEv = races.update(dt, state.inCar ? state.car.pos : null, state.inCar);
+      if (raceEv && raceEv.countdown) toast(raceEv.countdown);
+      if (raceEv && raceEv.gate) toast(`Gate ${raceEv.gate}/${races.route.gates.length} — keep it flat!`);
+      if (raceEv && raceEv.abandoned) toast(races.lastResult);
+      if (raceEv && raceEv.finished) {
+        state.money += raceEv.prize;
+        audio.jingle();
+        toast(races.lastResult);
+        persistSave();
+      }
+      // Courier runs: delivery pays, expiry costs nothing but the parcel.
+      const delEv = delivery.update(dt, focusPos);
+      if (delEv && delEv.delivered) {
+        state.money += delEv.pay;
+        audio.chime();
+        toast(delivery.lastResult);
+        persistSave();
+      }
+      if (delEv && delEv.failed) {
+        audio.thud();
+        toast(delivery.lastResult);
+      }
+      // Biscuit: follows Mara, barks at gang members, sniffs packages.
+      pets.update(dt, player.pos, player.moving);
+      // The stray adopts Mara the first time she walks up to him (after
+      // the opening cutscenes have had their moment — 15s in).
+      if (!isShot && state.playTime > 15 && Math.hypot(player.pos.x - pets.pos.x, player.pos.z - pets.pos.z) < 7) {
+        if (story.showBiscuit(() => { state.mode = 'playing'; })) state.mode = 'story';
+      }
+
       // --- audio + autosave --------------------------------------------------
       audio.update(dt, {
         speed: state.inCar ? state.car.speed : 0,
@@ -777,6 +1012,27 @@ function frame() {
     window.__shotError = String(err && err.message ? err.message : err);
   }
   updateCamera(dt);
+  // Phase 6: the hint bar and the side line follow the nearest hustle —
+  // the pier, the casino door, a depot, a house door, or the race flag.
+  const houseAt = !state.inCar && !state.inBoat ? housing.doorAt(player.pos) : null;
+  const phase6Hint = !state.inCar && !state.inBoat ? (
+    housing.inside ? 'E — step out of the house' :
+    houseAt ? housing.promptText(houseAt) :
+    fishing.nearPier(player.pos) ? fishing.promptText() :
+    casino.nearCasino(player.pos) ? casino.promptText() :
+    delivery.nearDepot(player.pos) ? delivery.promptText() :
+    pets.pointing ? 'Biscuit is on a scent — follow him!' : ''
+  ) : (state.inCar && state.car && races.nearStart(state.car.pos) && !races.active ? races.promptText() : '');
+  const sideParts = [];
+  if (races.active) sideParts.push(races.statusText());
+  else if (fishing.state !== 'idle') sideParts.push(fishing.statusText());
+  else if (delivery.job) sideParts.push(delivery.statusText());
+  else if (casino.hiLo) sideParts.push(casino.statusText());
+  else {
+    const t = housing.statusText() || pets.statusText() || casino.statusText() || fishing.statusText() || delivery.statusText() || races.statusText();
+    if (t) sideParts.push(t);
+  }
+  if (police.ramming) sideParts.push('3-STAR RAM RUN!');
   hud.update({
     health: state.health,
     money: state.money,
@@ -813,6 +1069,10 @@ function frame() {
     turfZones: gangs.zones,
     boats: boats.boats,
     garagePos: customization.garagePos,
+    sideText: sideParts.join(' · '),
+    phase6Hint,
+    ramming: police.ramming,
+    phase6Markers: [...fishing.markers(), ...races.markers(), ...housing.markers(), ...casino.markers(), ...delivery.markers(), ...pets.markers()],
   });
   renderer.render(scene, camera);
   framesRendered++;

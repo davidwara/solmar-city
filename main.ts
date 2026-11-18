@@ -17,6 +17,16 @@
 // keeper, turf war), a second island with a lighthouse across the bay,
 // gang turf with passive income, a garage shop, and story cutscenes —
 // the mission screenshot now sails the bay to the island.
+// Phase 6: six more source modules (fishing.js, races.js, housing.js,
+// casino.js, delivery.js, pets.js) — pier fishing with a Golden Koi,
+// three checkpoint street races from the garage flag, three buyable
+// safehouses with a home respawn, slots + higher-or-lower at the Golden
+// Gull casino, courier parcels with tips, and Biscuit the stray dog —
+// plus a 3-star police ram run, a traffic intersection queue, tourist
+// pedestrians, an itemised hospital bill and a $50 melee bat. The
+// dossier now covers six more modules; the chase screenshot runs at
+// three stars and the mission screenshot fishes the pier at golden hour.
+// PHASE6_SYSTEMS lists the new systems for the build log below.
 //
 // The game is plain static files under this directory's game/ folder: a
 // three.js open-world crime game (game/index.html plus its ES modules, no
@@ -50,6 +60,13 @@ if (existsSync(join(here, 'screenshots'))) {
 // in game/ or 48 MiB of game files in all, or a path under game/ over 1000
 // bytes — game/ counts beside /output's own 1000-entry cap, its
 // screenshots/ and dossier.json).
+// Phase 6 systems, for the build log: the six new modules plus the five
+// small system upgrades they ride on.
+const PHASE6_SYSTEMS = [
+  'fishing', 'races', 'housing', 'casino', 'delivery', 'pets',
+  'police-ram-run', 'traffic-queue', 'tourist-peds', 'hospital-bill', 'melee-bat',
+];
+console.log(`Solmar City Phase 6 — ${PHASE6_SYSTEMS.length} new systems: ${PHASE6_SYSTEMS.join(', ')}`);
 writeFileSync(
   join(out, 'dossier.json'),
   buildDossier(out, {

@@ -211,6 +211,21 @@ export function createAudio() {
     blip(1300, 0.06, 'square', 0.14, 0.07);
   }
 
+  /** Phase 6: a splash when a fish takes the bait on the pier. */
+  function splash() {
+    ensure();
+    blip(320, 0.25, 'sine', 0.3);
+    blip(180, 0.3, 'triangle', 0.22, 0.06);
+    blip(520, 0.12, 'sine', 0.14, 0.02);
+  }
+
+  /** Phase 6: Biscuit's bark — two short square yaps. */
+  function dogBark() {
+    ensure();
+    blip(740, 0.09, 'square', 0.2);
+    blip(660, 0.11, 'square', 0.18, 0.13);
+  }
+
   /** Cycle the car radio: off -> SOLMAR FM -> NIGHT TIDE -> off. */
   function toggleStation() {
     ensure();
@@ -288,6 +303,8 @@ export function createAudio() {
   audio.setBoatEngine = setBoatEngine;
   audio.thunder = thunder;
   audio.shutter = shutter;
+  audio.splash = splash;
+  audio.dogBark = dogBark;
   audio.toggleStation = toggleStation;
   audio.stationName = stationName;
   audio.update = update;

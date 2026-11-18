@@ -154,10 +154,39 @@ export function spawnTraffic(scene, seed, count = 10) {
       // Phase 4: rain slows traffic too — wet roads, cautious drivers.
       const rainGrip = ctx.grip || 1;
       let targetSpeed = (blocker && !parkedBlock) || (blocker && !overtaking) ? 0 : (overtaking ? w.cruise * 0.7 : w.cruise) * rainGrip;
+      // Phase 6: the intersection queue. A car that stops behind a stopped
+      // car joins a queue at its place in line; when the light turns
+      // green the queue pulls away one car at a time — each car waits a
+      // short stagger for every queued car ahead of it on the same
+      // approach — instead of the whole line surging at once.
+      const leaderStopped = blocker && !parkedBlock && Math.abs(blocker.speed || 0) < 0.5;
+      if (leaderStopped) {
+        const gap = Math.hypot(blocker.pos.x - car.pos.x, blocker.pos.z - car.pos.z);
+        if (gap < 12 && !w.queued) {
+          let ahead = 0;
+          for (const o of cars) {
+            if (o === w || !o.queued) continue;
+            const laneOff = w.axis === 'ns' ? Math.abs(o.car.pos.x - car.pos.x) : Math.abs(o.car.pos.z - car.pos.z);
+            const inFront = w.axis === 'ns' ? (o.car.pos.z - car.pos.z) * w.dir > 0 : (o.car.pos.x - car.pos.x) * w.dir > 0;
+            if (laneOff < 8 && inFront) ahead += 1;
+          }
+          w.queued = true;
+          w.goDelay = (ahead + 1) * 0.7;
+        }
+      }
       // Red light: stop at the line instead of crossing the intersection.
       const light = lightAhead(w);
       const redForMe = light && (w.axis === 'ns' ? !light.nsGreen : !light.ewGreen);
       if (redForMe) targetSpeed = 0;
+      else if (w.queued) {
+        // Green — but only pull away when this car's place comes up.
+        if ((w.goDelay || 0) > 0) {
+          w.goDelay -= dt;
+          targetSpeed = 0;
+        } else {
+          w.queued = false;
+        }
+      }
       // Horn: stuck behind someone (or a red light queue) for a while and
       // the driver loses patience. Main plays the sound, once per honk.
       if (blocker && !parkedBlock && w.speed < 0.5) {
@@ -170,6 +199,7 @@ export function spawnTraffic(scene, seed, count = 10) {
         w.blockedTimer = 0;
       }
       w.speed += (targetSpeed - w.speed) * Math.min(1, dt * 2.5);
+      car.speed = w.speed; // keep the car object honest for queue checks
 
       // Heading follows axis + direction, eased so turns look like turns.
       const wantHeading = w.axis === 'ns' ? (w.dir > 0 ? 0 : Math.PI) : (w.dir > 0 ? Math.PI / 2 : -Math.PI / 2);

@@ -66,6 +66,16 @@ export function formatClock(hours) {
   return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
 }
 
+/**
+ * Phase 6: true in the golden hour (17:00–19:00), when the bay turns to
+ * copper — fishing's Golden Koi bites twice as often then, and the
+ * screenshot poses use it for their warmest light.
+ */
+export function isGoldenHour(hours) {
+  const h = ((hours % 24) + 24) % 24;
+  return h >= 17 && h < 19;
+}
+
 /** Create the day/night system. The city starts at 10:00, mid-morning. */
 export function createDayNight(scene, city) {
   // Lamp glows: soft additive sprites at every street lamp, invisible by
@@ -145,5 +155,6 @@ export function createDayNight(scene, city) {
   daynight.setHours = setHours;
   daynight.update = update;
   daynight.clockText = () => formatClock(daynight.hours);
+  daynight.isGoldenHour = () => isGoldenHour(daynight.hours);
   return daynight;
 }

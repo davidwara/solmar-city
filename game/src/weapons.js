@@ -12,6 +12,9 @@ export const GUN_PRICE = 400;
 export const MAG_SIZE = 12;
 export const SHOT_RANGE = 46;
 export const SHOP_POS = new THREE.Vector3(10.5, 0, 62);
+// Phase 6: the melee bat — cheap, longer reach than a bare fist, no ammo.
+export const BAT_PRICE = 50;
+export const BAT_REACH = 3.6;
 
 // A canvas sign for the shop front: green board, white lettering, no assets.
 function shopSignTexture() {
@@ -79,6 +82,14 @@ export function createWeapons(scene) {
   );
   beam.position.y = 9;
   shop.add(beam);
+  // Phase 6: the bat for sale — a wooden slugger leaning on the shop post.
+  const batMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.09, 0.13, 1.5, 8),
+    new THREE.MeshLambertMaterial({ color: 0x8a6a45 }),
+  );
+  batMesh.position.set(3.4, 1.4, 0.6);
+  batMesh.rotation.z = 0.35;
+  shop.add(batMesh);
   shop.position.copy(SHOP_POS);
   scene.add(shop);
 
@@ -95,6 +106,7 @@ export function createWeapons(scene) {
 
   const weapons = {
     owned: false,
+    bat: false, // Phase 6: the $50 melee bat from the same shop
     mag: 0,
     reserve: 0,
     cooldown: 0,
@@ -119,6 +131,22 @@ export function createWeapons(scene) {
     weapons.mag = MAG_SIZE;
     weapons.reserve = 36;
     return 'ok';
+  }
+
+  /**
+   * Phase 6: buy the bat at the same shop — $50, no ammo, and a longer
+   * swing than a bare fist. Returns 'ok', 'owned' or 'broke'.
+   */
+  function buyBat(money) {
+    if (weapons.bat) return 'owned';
+    if (money < BAT_PRICE) return 'broke';
+    weapons.bat = true;
+    return 'ok';
+  }
+
+  /** Melee reach: the bat's 3.6m when owned, otherwise the bare-fist 2.4m. */
+  function meleeReach() {
+    return weapons.bat ? BAT_REACH : 2.4;
   }
 
   /** HUD line: pistol + rounds, or the shop hint when unarmed. */
@@ -235,6 +263,8 @@ export function createWeapons(scene) {
 
   weapons.nearShop = nearShop;
   weapons.buy = buy;
+  weapons.buyBat = buyBat;
+  weapons.meleeReach = meleeReach;
   weapons.ammoText = ammoText;
   weapons.shoot = shoot;
   weapons.reload = reload;

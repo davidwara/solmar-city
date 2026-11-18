@@ -12,6 +12,15 @@ const PANTS = [0x2e4a6b, 0x333333, 0x5a4a3a, 0x4a5a6b];
 const IDLE_BARKS = ['Nice day!', 'Hey, Mara!', 'Traffic again…', 'Go Solmar!', 'What a view!', 'Late for work!'];
 const SCARED_BARKS = ['Help!', 'Watch it!', 'Are you crazy?!', 'Somebody call the law!', 'Hey!'];
 const ANGRY_BARKS = ['Hey!', 'Watch where you\u2019re going!', 'Rude!', 'My shoes!'];
+// Phase 6: tourists — a few visitors who stop at the scenic spots and
+// take photos instead of walking the sidewalks all day.
+const TOURIST_SPOTS = [
+  { x: -40, z: 214, line: 'The bay at sunset…' },
+  { x: 40, z: 300, line: 'The causeway!' },
+  { x: 120, z: 390, line: 'The lighthouse!' },
+  { x: 0, z: 124, line: 'Downtown!' },
+];
+const TOURIST_BARKS = ['Say cheese!', 'What a view!', 'Photo time!', 'For the album!'];
 
 function buildPedFigure(shirt, pants, scale) {
   const group = new THREE.Group();
@@ -63,6 +72,11 @@ export function spawnPedestrians(scene, seed, count = 26) {
       barkTimer: rand(rng, 6, 20), // idle chatter, every few seconds
       barkSprite: null,
       barkLife: 0,
+      // Phase 6: the first three residents are tourists — they wander
+      // between the scenic spots and stop to take photos there.
+      tourist: i < 3,
+      photoTimer: rand(rng, 4, 12),
+      photoPause: 0,
     });
   }
 
@@ -171,6 +185,33 @@ export function spawnPedestrians(scene, seed, count = 26) {
         }
       }
       if (p.fleeTimer > 0) p.fleeTimer -= dt;
+      // Phase 6: tourists stop at the scenic spots and take photos.
+      if (p.tourist && p.fleeTimer <= 0) {
+        p.photoTimer -= dt;
+        if (p.photoPause > 0) {
+          p.photoPause -= dt;
+          // Stand still, camera arm raised, while the photo happens.
+          p.parts.armR.rotation.x = -2.4;
+          continue;
+        }
+        if (p.photoTimer <= 0) {
+          let spot = null;
+          let bestD = 12;
+          for (const s of TOURIST_SPOTS) {
+            const d = Math.hypot(s.x - p.pos.x, s.z - p.pos.z);
+            if (d < bestD) { bestD = d; spot = s; }
+          }
+          if (spot) {
+            p.photoPause = 3;
+            p.photoTimer = rand(rng, 10, 20);
+            bark(p, pick(rng, TOURIST_BARKS));
+          } else {
+            const s = pick(rng, TOURIST_SPOTS);
+            p.target.set(s.x + rand(rng, -3, 3), 0, s.z + rand(rng, -3, 3));
+            p.photoTimer = rand(rng, 8, 16);
+          }
+        }
+      }
       const dx = p.target.x - p.pos.x;
       const dz = p.target.z - p.pos.z;
       const dist = Math.hypot(dx, dz);

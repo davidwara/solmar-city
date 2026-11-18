@@ -25,6 +25,7 @@ export function createPolice(scene, seed) {
     decayTimer: 0,
     ramCooldown: 0, // seconds until the next ram may hurt the player
     flash: 0,
+    ramming: false, // Phase 6: true while a 3-star ram run is on
   };
 
   function spawnOne(x, z, heading) {
@@ -111,6 +112,7 @@ export function createPolice(scene, seed) {
 
     if (police.wanted === 0) {
       // No heat: patrol cars drift off and despawn.
+      police.ramming = false;
       for (const unit of police.cars) {
         unit.car.group.visible = false;
       }
@@ -137,14 +139,24 @@ export function createPolice(scene, seed) {
       const dist = Math.hypot(dx, dz);
       nearestDist = Math.min(nearestDist, dist);
 
+      // Phase 6: three stars means a ram run. At full heat the patrol
+      // cars stop creeping up to Mara's bumper and go for the hit: faster
+      // top speed, a sharper turn rate, and no slowing down when close —
+      // they aim straight at her car and shove it off line. On foot the
+      // chase stays the same, so a runner can still slip away.
+      const ramMode = police.wanted === 3 && inCar;
+      police.ramming = ramMode;
       // Steer toward the player, capped turn rate so the chase is escapable.
       const wantHeading = Math.atan2(dx, dz);
-      car.heading += clamp(angleDiff(car.heading, wantHeading), -1.9 * dt, 1.9 * dt);
-      const topSpeed = 24 + police.wanted * 2.5;
+      const turnRate = ramMode ? 2.8 : 1.9;
+      car.heading += clamp(angleDiff(car.heading, wantHeading), -turnRate * dt, turnRate * dt);
+      const topSpeed = 24 + police.wanted * 2.5 + (ramMode ? 6 : 0);
       // Close in fast from afar, but creep in when near: at full speed a
       // pursuit car just orbits the player and can never pin her down
       // (on foot) or ram her (in a car). Creeping keeps it on her bumper.
-      const targetSpeed = dist > 90 ? topSpeed : dist < 14
+      // (A ram run skips the creep: at 3 stars the car holds top speed
+      // all the way into the hit.)
+      const targetSpeed = ramMode ? topSpeed : dist > 90 ? topSpeed : dist < 14
         ? Math.max(3.5, topSpeed * (dist / 30))
         : topSpeed * 0.92;
       unit.speed += (targetSpeed - unit.speed) * Math.min(1, dt * 1.4);
@@ -161,10 +173,12 @@ export function createPolice(scene, seed) {
       if (inCar && playerCar) {
         // Ram: shove the player's car and hurt her — but at most once
         // every 0.8s, so a touch is a bump, not an instant wreck.
+        // A 3-star ram run hits twice as hard: more speed lost, more shove.
         if (dist < 4.2 && police.ramCooldown <= 0) {
-          playerCar.speed *= 0.82;
-          playerCar.pos.x += (playerCar.pos.x - car.pos.x) * 0.06;
-          playerCar.pos.z += (playerCar.pos.z - car.pos.z) * 0.06;
+          playerCar.speed *= ramMode ? 0.68 : 0.82;
+          const shove = ramMode ? 0.14 : 0.06;
+          playerCar.pos.x += (playerCar.pos.x - car.pos.x) * shove;
+          playerCar.pos.z += (playerCar.pos.z - car.pos.z) * shove;
           if (dist < 3.4) {
             events.rammed = true;
             police.ramCooldown = 0.8;

@@ -13,6 +13,11 @@
 // Phase 5 note: same again — boats, the island, gangs, the garage and
 // the story cutscenes are plain static ES modules too; the server still
 // does nothing but serve files, and the new systems need no new MIME type.
+// Phase 6 note: same again — fishing, races, safehouses, the casino,
+// courier runs and Biscuit are plain static ES modules too; the server
+// still does nothing but serve files, and the new systems need no new
+// MIME type. The six new modules load through index.html's module graph
+// like every other game/src/ file before them.
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';

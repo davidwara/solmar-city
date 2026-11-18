@@ -14,6 +14,9 @@ export const ISLAND_BOUNDS = { minX: -80, maxX: 160, minZ: 300, maxZ: 430 };
 export const LIGHTHOUSE_POS = new THREE.Vector3(120, 0, 398);
 export const ISLAND_DOCK = new THREE.Vector3(40, 0, 312);
 export const CAUSEWAY_X = 40;
+// Phase 6: the Island Villa lot — the priciest safehouse, on the open
+// grass south of the plaza fountain, clear of the island blocks.
+export const VILLA_POS = { x: 100, z: 360 };
 
 const ISLAND_PALETTE = [
   0xf2e3c9, 0xe8b4a0, 0x7fb3c8, 0x9db98a, 0xe6d7b8, 0xd98a7a, 0xf0c98a,
@@ -208,6 +211,19 @@ export function buildIsland(scene, seed) {
   );
   basin.position.set(24, 0.5, 352);
   scene.add(basin);
+  // Phase 6: the villa garden — two palms and a low hedge framing the
+  // Island Villa lot south of the plaza, so the house reads as a garden.
+  for (const [gx, gz] of [[VILLA_POS.x - 10, VILLA_POS.z + 6], [VILLA_POS.x + 10, VILLA_POS.z + 6]]) {
+    const palm = makeIslandPalm(rng);
+    palm.position.set(gx, 0, gz);
+    scene.add(palm);
+  }
+  const hedge = new THREE.Mesh(
+    new THREE.BoxGeometry(24, 1.1, 1),
+    new THREE.MeshLambertMaterial({ color: 0x3f8a4a }),
+  );
+  hedge.position.set(VILLA_POS.x, 0.55, VILLA_POS.z + 9);
+  scene.add(hedge);
   const water = new THREE.Mesh(
     new THREE.CylinderGeometry(4.0, 4.0, 0.3, 14),
     new THREE.MeshBasicMaterial({ color: 0x2e7fb8 }),

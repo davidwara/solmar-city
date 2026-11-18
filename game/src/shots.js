@@ -13,7 +13,11 @@
 // Poses set the hour through the day/night system, so the HUD clock always
 // agrees with the sky in the frame.
 
-export const SHOT_NAMES = ['drive', 'street', 'vista', 'menu', 'chase', 'mission', 'night'];
+// Phase 6: two new poses — 'fish' (Mara fishing off the east pier at
+// golden hour, Biscuit at her heel) and 'race' (Mara lined up at the
+// garage flag for the Harbour Sprint) — and the chase pose runs at three
+// stars now, so the patrol cars' ram run shows in the frame.
+export const SHOT_NAMES = ['drive', 'street', 'vista', 'menu', 'chase', 'mission', 'night', 'fish', 'race'];
 
 /**
  * Stage a pose. ctx: { scene, city, player, cars, traffic, peds, police,
@@ -83,8 +87,9 @@ export function stageShot(name, ctx) {
     return 'fixed';
   }
   if (name === 'chase') {
-    // Two stars, two patrol cars on Mara's tail, traffic ahead, golden
-    // late-afternoon light: the wanted system in action.
+    // Three stars, three patrol cars on Mara's tail — the Phase 6 ram run:
+    // at full heat the patrol cars stop creeping and go straight for her
+    // bumper. Golden late-afternoon light, traffic ahead.
     ctx.daynight.setHours(17.5);
     missions.startMission(1); // Hot Delivery — the job that starts wanted
     car.pos.set(3.5, 0, -30);
@@ -92,9 +97,10 @@ export function stageShot(name, ctx) {
     car.speed = 6; // rolling slowly: the patrol cars close in on her bumper
     car.driven = true;
     ctx.enterCar(car);
-    police.setWanted(2, player.pos);
-    police.place(0, 0, -52, 0);
-    police.place(1, 7, -62, 0);
+    police.setWanted(3, player.pos);
+    police.place(0, 0, -40, 0);
+    police.place(1, 7, -46, 0);
+    police.place(2, -3.5, -43, 0); // third car, close behind so all three read in frame at capture
     traffic.place(0, 3.5, 30, 'ns', 1, 11);
     traffic.place(1, -3.5, -110, 'ns', -1, 10);
     peds.place(0, 12, -10);
@@ -103,7 +109,7 @@ export function stageShot(name, ctx) {
     // cars closing in behind it in the same lane. A fixed camera is robust
     // here because the car crosses the frame, not away from it, whatever
     // the headless frame rate is.
-    ctx.setCamera(16, 7, -2, 0, 2, -32);
+    ctx.setCamera(26, 11, 10, 0, 2, -38);
     ctx.setState('playing');
     return 'fixed';
   }
@@ -148,6 +154,45 @@ export function stageShot(name, ctx) {
     peds.place(0, 10, 196);
     peds.place(1, -8, 200);
     ctx.setCamera(8, 9, 212, -2, 2, 140);
+    ctx.setState('playing');
+    return 'fixed';
+  }
+  if (name === 'fish') {
+    // Golden hour on the east pier: Mara's line is cast, the bobber rides
+    // the swell off the pier tip, Biscuit waits at her heel, and the bay
+    // turns copper behind them. The fishing side-hustle, live in frame.
+    ctx.daynight.setHours(17.5);
+    missions.startMission(0);
+    player.pos.set(100, 0, 232);
+    player.heading = 0; // facing the water (south, +z, off the pier tip)
+    ctx.exitCar(true);
+    ctx.fishing.cast(player.pos);
+    if (ctx.pets && ctx.pets.dog) ctx.pets.dog.position.set(95, 0, 228);
+    peds.place(0, 84, 214);
+    peds.place(1, 116, 210);
+    traffic.place(0, 62, 186, 'ew', 1, 10);
+    // Low from the beach, looking south-east along the pier into the bay.
+    ctx.setCamera(84, 5, 216, 100, 1, 252);
+    ctx.setState('playing');
+    return 'fixed';
+  }
+  if (name === 'race') {
+    // Lined up at the chequered flag by the Solmar Garage: the Harbour
+    // Sprint countdown is running, the first gate glows green up the
+    // avenue ahead, and the spoiler is already bolted on.
+    ctx.daynight.setHours(10);
+    missions.startMission(0);
+    car.pos.set(124, 0, 200);
+    car.heading = Math.PI; // facing north, up the avenue to gate one
+    car.speed = 0;
+    car.driven = true;
+    ctx.enterCar(car);
+    ctx.races.start(0, car);
+    traffic.place(0, 62, 186, 'ew', 1, 10);
+    peds.place(0, 110, 186);
+    peds.place(1, 138, 210);
+    // Behind the car, over its roof, up the avenue toward the first gate.
+    ctx.setCamera(124, 7, 224, 124, 2, 150);
     ctx.setState('playing');
     return 'fixed';
   }

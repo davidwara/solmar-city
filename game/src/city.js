@@ -19,6 +19,10 @@ export const CITY = {
   bound: 235,
 };
 
+// Phase 6: the Golden Gull casino sits on the downtown-east block
+// (between the 124 and 186 streets), door facing south.
+export const CASINO_POS = { x: 155, z: 155 };
+
 const PALETTE = [
   0xf2e3c9, 0xe8b4a0, 0xd9a441, 0x7fb3c8, 0xc96f5a, 0x9db98a,
   0xe6d7b8, 0xb7c9d9, 0xf0c98a, 0xd98a7a, 0x8aa8b8, 0xe9e2d0,
@@ -171,6 +175,10 @@ export function buildCity(scene, seed) {
     }
   }
   for (const b of blockCentres) {
+    // Phase 6: two blocks are kept clear for hand-placed landmarks — the
+    // Golden Gull casino (155, 155) and the Downtown Loft lot (93, -93)
+    // — so their walls never intersect a procedural tower.
+    if ((b.x === 155 && b.z === 155) || (b.x === 93 && b.z === -93)) continue;
     const downtown = Math.abs(b.x) <= 95 && Math.abs(b.z) <= 95;
     const count = downtown ? randInt(rng, 1, 2) : randInt(rng, 2, 4);
     for (let k = 0; k < count; k++) {
@@ -259,6 +267,23 @@ export function buildCity(scene, seed) {
     boat.rotation.y = rand(rng, -0.2, 0.2);
     scene.add(boat);
   }
+
+  // Phase 6: the Golden Gull casino — a gold-fronted block on the
+  // downtown-east block, with a purple door facing south. It is a solid
+  // building (collider included) so Mara walks around it, not through it.
+  const casinoBody = new THREE.Mesh(
+    new THREE.BoxGeometry(22, 12, 22),
+    new THREE.MeshLambertMaterial({ color: 0x3a2b4a }),
+  );
+  casinoBody.position.set(CASINO_POS.x, 6, CASINO_POS.z);
+  scene.add(casinoBody);
+  const casinoTrim = new THREE.Mesh(
+    new THREE.BoxGeometry(23, 1.6, 23),
+    new THREE.MeshBasicMaterial({ color: 0xffd23f }),
+  );
+  casinoTrim.position.set(CASINO_POS.x, 11.4, CASINO_POS.z);
+  scene.add(casinoTrim);
+  colliders.push({ minX: CASINO_POS.x - 11, maxX: CASINO_POS.x + 11, minZ: CASINO_POS.z - 11, maxZ: CASINO_POS.z + 11 });
 
   return { colliders, landmarks, sun, hemi, lampMat, roadMat };
 }

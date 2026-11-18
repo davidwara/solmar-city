@@ -146,6 +146,19 @@ export function createGangs(scene, seed) {
   }
 
   /**
+   * Phase 6: every rival standing within maxDist of a point — Biscuit
+   * barks at the whole pack, not just the nearest one.
+   */
+  function rivalsNear(pos, maxDist) {
+    const out = [];
+    for (const m of members) {
+      if (m.down) continue;
+      if (Math.hypot(m.pos.x - pos.x, m.pos.z - pos.z) < maxDist) out.push(m);
+    }
+    return out;
+  }
+
+  /**
    * Advance gangs. Returns events:
    * { claimed, claimedName, income, damage } — claimed fires when a zone
    * flips to Mara, income pays $50 per owned turf per minute, damage is
@@ -256,6 +269,7 @@ export function createGangs(scene, seed) {
     armTurfMission,
     knockDown,
     nearestRival,
+    rivalsNear,
     saveData,
     restore,
     claimTime: CLAIM_TIME,

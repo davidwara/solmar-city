@@ -36,8 +36,9 @@ export function createCombat() {
   /**
    * Throw a punch. Returns the pedestrian hit, or null (miss / on cooldown).
    * Only pedestrians standing in front of Mara, inside range, can be hit.
+   * `reach` is the swing distance — the bat's 3.6m when Mara owns one.
    */
-  function tryPunch(player, peds) {
+  function tryPunch(player, peds, reach = PUNCH_RANGE) {
     if (combat.cooldown > 0) return null;
     combat.cooldown = PUNCH_COOLDOWN;
     setPunch(player);
@@ -48,7 +49,7 @@ export function createCombat() {
       const dx = p.pos.x - player.pos.x;
       const dz = p.pos.z - player.pos.z;
       const d = Math.hypot(dx, dz);
-      if (d > PUNCH_RANGE) continue;
+      if (d > reach) continue;
       // Must be in front of Mara (dot product with facing direction).
       if ((dx * fx + dz * fz) / Math.max(d, 0.001) < 0.35) continue;
       peds.knockDown(p);

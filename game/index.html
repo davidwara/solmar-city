@@ -34,6 +34,7 @@
   #weather { font-size: 15px; font-weight: bold; letter-spacing: 2px; color: #bfe3ff; text-shadow: 0 2px 4px #000; }
   #packages { font-size: 15px; font-weight: bold; letter-spacing: 1px; color: #7df9ff; text-shadow: 0 2px 4px #000; }
   #turf { font-size: 15px; font-weight: bold; letter-spacing: 1px; color: #b8ff9d; text-shadow: 0 2px 4px #000; }
+  #side-line { font-size: 14px; font-weight: bold; letter-spacing: 1px; color: #ffe9a8; text-shadow: 0 2px 4px #000; }
   /* Phase 5: story cutscene + garage shop overlays */
   #story-overlay { display: none; background: linear-gradient(transparent 55%, rgba(8,14,24,0.9)); z-index: 25; align-items: flex-end; }
   #story-box { max-width: 720px; width: 90%; margin-bottom: 70px; background: rgba(10,18,30,0.88);
@@ -100,6 +101,7 @@
     <div id="weather">☀ CLEAR</div>
     <div id="packages">Packages 0/15</div>
     <div id="turf">Turf 0/3</div>
+    <div id="side-line"></div>
   </div>
   <canvas id="minimap" width="190" height="190"></canvas>
   <div id="ammo"></div>
@@ -144,12 +146,18 @@
     island, light its lighthouse after dark, and take turf from the Vipers,
     Sharks and Crows — every turf you hold pays $50 a minute. Tune your ride
     at the Solmar Garage. Fifteen hidden packages are stashed
-    around town — find them all for a $1,000 bonus.</p>
+    around town — find them all for a $1,000 bonus. And when Rico has no
+    work, the city still pays: fish off the east pier, race the avenues
+    from the garage flag, run courier parcels, try the Golden Gull casino,
+    buy a safehouse to wake up in, and keep Biscuit the stray dog fed.</p>
     <div class="controls">
       <b>WASD</b> move / drive / sail &nbsp;·&nbsp; <b>Mouse drag</b> look around<br>
       <b>Shift</b> run &nbsp;·&nbsp; <b>Space</b> jump &nbsp;·&nbsp; <b>E</b> enter / exit car or boat<br>
-      <b>Click</b> shoot &nbsp;·&nbsp; <b>R</b> reload &nbsp;·&nbsp; <b>G</b> buy pistol ($400) / garage<br>
-      <b>F</b> punch &nbsp;·&nbsp; <b>Q</b> car radio &nbsp;·&nbsp; <b>C</b> snap a photo (Shutterbug)<br>
+      <b>Click</b> shoot &nbsp;·&nbsp; <b>R</b> reload &nbsp;·&nbsp; <b>G</b> buy pistol ($400) / garage / slots<br>
+      <b>F</b> punch / fish (on the pier) &nbsp;·&nbsp; <b>Q</b> car radio &nbsp;·&nbsp; <b>C</b> snap a photo (Shutterbug)<br>
+      <b>T</b> start a street race (in a car, at the garage flag)<br>
+      <b>H</b> feed Biscuit ($10) &nbsp;·&nbsp; <b>V</b> Biscuit, find a package<br>
+      <b>U</b> / <b>I</b> higher / lower at the card table &nbsp;·&nbsp; <b>X</b> cash out<br>
       <b>M</b> mute &nbsp;·&nbsp; <b>J</b> jobs &nbsp;·&nbsp; <b>R</b> retry job<br>
       <b>P</b> pause &nbsp;·&nbsp; <b>Wheel</b> zoom camera
     </div>

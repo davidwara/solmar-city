@@ -24,6 +24,13 @@ stash.
 - **Sail a boat** — E near a moored boat at the marina (W throttle, A/D rudder)
 - **Car radio** — Q while driving (SOLMAR FM bassline / NIGHT TIDE synth)
 - **Snap a photo** — C on the Shutterbug job (get close to the scenic spot)
+- **Fish** — F on the east pier to cast, F again on the bite to reel in (Minnow $15, Bass $40, Golden Koi $200 — likelier at golden hour); E at the pier sells the bucket
+- **Street race** — T in a car at the chequered flag by the garage (Harbour Sprint $300, Beachfront Dash $500, Island Loop $800; best times saved, spoiler bolted on at the first start)
+- **Safehouse** — E at a house door to buy (Beach Hut $1,500, Downtown Loft $4,000, Island Villa $8,000) and E again to step inside; the last house entered is your respawn point
+- **Casino** — G at the Golden Gull door for slots ($50 a spin, $2,500 jackpot); C for the card table ($50 a round, U higher / I lower, X cash out, up to 3 doubles)
+- **Courier** — E at a depot to pick up a parcel (Downtown, Westside, Marina Market); deliver fast for up to $60 in tips
+- **Biscuit** — H feeds the stray dog a $10 snack, V sends him sniffing for the nearest hidden package
+- **Melee bat** — G at the gun shop once you own the pistol ($50, longer reach than a bare fist, no ammo)
 - **Mute** — M · **Jobs** — J · **Retry job** — R (when the pistol is full)
 - **Pause** — Esc or P
 - **HUD** — health, money, wanted stars, mission tracker, minimap
@@ -31,6 +38,51 @@ stash.
   packages, second island, gang turf, boats, garage), pistol ammo, a day/night
   clock, a weather icon, a package counter, a turf counter, boat speed on
   the water, and the radio station while driving
+
+## The living city (Phase 6)
+
+When Rico has no work, the city still pays. Six side hustles now run
+alongside the twelve jobs:
+
+- **Fishing** — a wooden pier juts off the east beach into the bay. Cast
+  with **F**, watch the bobber ride the swell and the sea breeze, and reel
+  in with **F** when it dips: Minnow $15, Bass $40, and the rare Golden
+  Koi $200 — twice as likely in the golden hour (17:00–19:00). Sell the
+  bucket at the pier with **E**.
+- **Street races** — three checkpoint routes from the chequered flag at
+  the Solmar Garage: **Harbour Sprint** ($300), **Beachfront Dash**
+  ($500), **Island Loop** ($800, out across the causeway and back). Press
+  **T** in a car at the flag for a 3-2-1-GO countdown; gates glow green
+  in order, best times save per route, and the first start bolts a
+  spoiler onto Mara's car.
+- **Safehouses** — three homes for sale: **Beach Hut** $1,500,
+  **Downtown Loft** $4,000, **Island Villa** $8,000. Buy with **E** at the
+  door, step inside to a furnished room (bed, table, lamp, rug), and the
+  last house Mara enters becomes her respawn point — after a WASTED trip
+  she wakes up at home instead of the hospital.
+- **Casino** — the **Golden Gull** on the downtown-east block, gold trim
+  and a purple door. **G** pulls the slots ($50 a spin, three SEVENs is
+  the $2,500 jackpot); **C** sits at the card table ($50 a round, call
+  higher with **U** or lower with **I**, each right call doubles the pot
+  up to three rounds, **X** cashes out).
+- **Courier** — three depots (Downtown, Westside, Marina Market) hand out
+  parcels with **E**; deliver to the gold diamond on the minimap before
+  the timer runs out for $40 plus up to $60 in tips.
+- **Biscuit** — the stray dog who adopts Mara. He trots after her, barks
+  at gang members, and on **V** runs toward the nearest hidden package
+  still out there and barks at it. **H** buys him a $10 snack; a happy
+  dog walks closer.
+
+And the old systems got sharper: at **three stars** the patrol cars run
+a **ram run** — faster, sharper, and twice the shove, with a `3-STAR RAM
+RUN!` warning on the HUD. Traffic now forms a real **intersection
+queue** — cars hold their place at a red light and pull away one at a
+time when it turns green. A few pedestrians are **tourists** who stop at
+the scenic spots and take photos. The **hospital bill is itemised** now
+(bed + treatment, still 10% in total), and the gun shop sells a **melee
+bat** ($50, longer reach than a fist, no ammo). The J panel lists the
+side hustles under the twelve jobs, and the minimap marks the pier, the
+race flag and gates, the house doors, the casino, the depots and Biscuit.
 
 ## The living city (Phase 5)
 
@@ -63,8 +115,8 @@ her wallet while she plays. Rival members patrol their own turf and
 attack Mara on sight with their fists; knock one down with **F** and he
 stays down for 25 seconds. Turf you own is saved with the game.
 
-The Solmar Garage on the east side tunes Mara's ride: six paints ($200
-each), two engine levels ($500, then $1,000 — each adds top speed) and
+The Solmar Garage on the east side tunes Mara's ride: seven paints ($200
+each, including matte Shark Grey for race nights), two engine levels ($500, then $1,000 — each adds top speed) and
 bolt-on armour ($400, +50 max health). Press **G** on the garage lot to
 open the shop; paint and engine apply to whatever car Mara drives next,
 and the choices save with the game.

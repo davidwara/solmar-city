@@ -22,6 +22,18 @@ export function createWasted() {
   }
 
   /**
+   * Phase 6: the itemised bill behind the 10% — a bed charge (4% of her
+   * cash) plus treatment (6%), so the WASTED screen can show what the
+   * hospital actually charged her for. The two parts always add up to
+   * hospitalBill().
+   */
+  function billBreakdown(money) {
+    const bed = Math.floor(money * 0.04);
+    const treatment = Math.floor(money * 0.1) - bed;
+    return { bed, treatment, total: bed + treatment };
+  }
+
+  /**
    * Show the WASTED overlay for `seconds`, then call done(). While the
    * overlay is up the game is paused behind it.
    */
@@ -62,6 +74,7 @@ export function createWasted() {
   }
 
   wasted.hospitalBill = hospitalBill;
+  wasted.billBreakdown = billBreakdown;
   wasted.showWasted = showWasted;
   wasted.countBusted = countBusted;
   wasted.update = update;

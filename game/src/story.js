@@ -138,6 +138,27 @@ export function createStory() {
     return Boolean(SCRIPTS[jobIndex]);
   }
 
+  /**
+   * Phase 6: a one-off side scene — Biscuit the stray dog adopts Mara
+   * the first time she walks up to him. Same typewriter overlay as the
+   * job cutscenes, but it plays once and never blocks a job.
+   */
+  function showBiscuit(onDone) {
+    if (!overlay || story.biscuitShown) return false;
+    story.biscuitShown = true;
+    story.lines = [
+      { who: 'Mara', line: 'Hey — where did you come from? You look like you own this street.' },
+      { who: 'Biscuit', line: '(The stray wags his tail and falls in beside her. He is hers now.)' },
+      { who: 'Mara', line: 'Fine. Biscuit it is. Stay close — and stay out of the road.' },
+    ];
+    story.index = 0;
+    story.done = onDone || null;
+    story.active = true;
+    overlay.style.display = 'flex';
+    showLine();
+    return true;
+  }
+
   /** A random idle bark for the overlay's flavour line (unused by play). */
   function randomTagline(seed) {
     const rng = createRng(seed);
@@ -149,5 +170,5 @@ export function createStory() {
     return tags[Math.floor(rng() * tags.length)];
   }
 
-  return { story, active: () => story.active, showFor, advance, skip, update, hasScript, randomTagline };
+  return { story, active: () => story.active, showFor, showBiscuit, advance, skip, update, hasScript, randomTagline };
 }

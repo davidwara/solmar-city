@@ -20,6 +20,8 @@ export const PAINTS = [
   { name: 'Viper Green', color: 0x3fae6a, css: '#3fae6a' },
   { name: 'Royal Purple', color: 0x8a5fc0, css: '#8a5fc0' },
   { name: 'Midnight', color: 0x222831, css: '#222831' },
+  // Phase 6: the seventh paint — matte shark grey, for race nights.
+  { name: 'Shark Grey', color: 0x6b7280, css: '#6b7280' },
 ];
 export const PAINT_PRICE = 200;
 export const ENGINE_PRICES = [500, 1000]; // level 1, then level 2
