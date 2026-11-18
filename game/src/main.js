@@ -491,7 +491,7 @@ function frame() {
         audio.thud();
       }
       if (policeEvents.busted) handleBusted();
-      if (state.wanted === 0 && state.health < 100) state.health = Math.min(100, state.health + 2 * dt);
+      if (state.wanted === 0 && state.health > 0 && state.health < 100) state.health = Math.min(100, state.health + 2 * dt);
       if (state.health <= 0) handleWasted();
 
       // --- missions ----------------------------------------------------------

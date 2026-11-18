@@ -5,7 +5,8 @@
 // every pose only uses systems that exist in the build (Phase 2: traffic,
 // pedestrians, police pursuit and missions all run live in the shot;
 // Phase 3: the pistol, the night cycle, traffic lights and ped barks).
-import { setTimeOfDay } from './city.js';
+// Poses set the hour through the day/night system, so the HUD clock always
+// agrees with the sky in the frame.
 
 export const SHOT_NAMES = ['drive', 'street', 'vista', 'menu', 'chase', 'mission', 'night'];
 
@@ -20,7 +21,7 @@ export function stageShot(name, ctx) {
   if (name === 'drive') {
     // Mara driving downtown, towers ahead, traffic on the avenue, a
     // pedestrian on the sidewalk, HUD + minimap + job tracker live.
-    setTimeOfDay(ctx.scene, ctx.city, 0);
+    ctx.daynight.setHours(10);
     missions.startMission(0);
     car.pos.set(3.5, 0, -60);
     car.heading = 0;
@@ -38,7 +39,7 @@ export function stageShot(name, ctx) {
   if (name === 'street') {
     // On foot on the main avenue, midday sun, a parked car ahead and
     // pedestrians walking the sidewalk.
-    setTimeOfDay(ctx.scene, ctx.city, 0);
+    ctx.daynight.setHours(12);
     missions.startMission(0);
     player.pos.set(2, 0, -30);
     player.heading = 0;
@@ -61,7 +62,7 @@ export function stageShot(name, ctx) {
     // Golden-hour vista from the beach: car at the beachfront intersection,
     // downtown towers rising behind it, sea at the camera's back, traffic
     // cruising the beachfront road.
-    setTimeOfDay(ctx.scene, ctx.city, 1);
+    ctx.daynight.setHours(18.5);
     missions.startMission(0);
     car.pos.set(0, 0, 186);
     car.heading = Math.PI;
@@ -79,7 +80,7 @@ export function stageShot(name, ctx) {
   if (name === 'chase') {
     // Two stars, two patrol cars on Mara's tail, traffic ahead, golden
     // late-afternoon light: the wanted system in action.
-    setTimeOfDay(ctx.scene, ctx.city, 0.55);
+    ctx.daynight.setHours(17.5);
     missions.startMission(1); // Hot Delivery — the job that starts wanted
     car.pos.set(3.5, 0, -30);
     car.heading = 0;
@@ -122,7 +123,7 @@ export function stageShot(name, ctx) {
     traffic.place(0, -3.5, -90, 'ns', -1, 10);
     traffic.place(1, 3.5, 30, 'ns', 1, 9);
     const scared = peds.place(0, 12, -22);
-    peds.bark(scared, 'Help!');
+    peds.bark(scared, 'Help!', 30); // long bubble so the shot catches it
     peds.place(1, -12, -48);
     peds.place(2, 12, -58);
     ctx.setCamera(2, 4.5, -44, 2, 1.6, -30);
@@ -149,7 +150,7 @@ export function stageShot(name, ctx) {
     return 'fixed';
   }
   // menu: sunset over the city behind the start screen.
-  setTimeOfDay(ctx.scene, ctx.city, 0.85);
+  ctx.daynight.setHours(18);
   missions.startMission(0);
   player.pos.set(0, 0, 120);
   ctx.exitCar(true);

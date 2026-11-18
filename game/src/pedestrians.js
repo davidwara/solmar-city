@@ -88,7 +88,7 @@ export function spawnPedestrians(scene, seed, count = 26) {
   }
 
   /** Put words over a pedestrian's head for a couple of seconds. */
-  function bark(p, text) {
+  function bark(p, text, life = 1.8) {
     if (!p || p.down) return;
     if (p.barkSprite) {
       p.group.remove(p.barkSprite);
@@ -98,7 +98,7 @@ export function spawnPedestrians(scene, seed, count = 26) {
     p.barkSprite = makeBarkSprite(text);
     p.barkSprite.position.y = 2.7;
     p.group.add(p.barkSprite);
-    p.barkLife = 1.8;
+    p.barkLife = life;
     p.barkTimer = rand(rng, 8, 22);
   }
 
