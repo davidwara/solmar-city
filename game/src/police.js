@@ -20,6 +20,7 @@ export function createPolice(scene, seed) {
     cars: [], // { car, lights, speed, bustTimer }
     unseenTimer: 0,
     decayTimer: 0,
+    ramCooldown: 0, // seconds until the next ram may hurt the player
     flash: 0,
   };
 
@@ -95,6 +96,7 @@ export function createPolice(scene, seed) {
   function update(dt, player, playerCar, inCar, colliders) {
     const events = { rammed: false, busted: false };
     police.flash += dt * 7;
+    if (police.ramCooldown > 0) police.ramCooldown -= dt;
     const target = inCar && playerCar ? playerCar.pos : player.pos;
 
     // Flash the light bars: red and blue alternate.
@@ -143,12 +145,16 @@ export function createPolice(scene, seed) {
       for (const w of car.wheels) w.rotation.x += unit.speed * dt * 2.2;
 
       if (inCar && playerCar) {
-        // Ram: shove the player's car and slow it.
-        if (dist < 4.2) {
+        // Ram: shove the player's car and hurt her — but at most once
+        // every 0.8s, so a touch is a bump, not an instant wreck.
+        if (dist < 4.2 && police.ramCooldown <= 0) {
           playerCar.speed *= 0.82;
           playerCar.pos.x += (playerCar.pos.x - car.pos.x) * 0.06;
           playerCar.pos.z += (playerCar.pos.z - car.pos.z) * 0.06;
-          if (dist < 3.4) events.rammed = true;
+          if (dist < 3.4) {
+            events.rammed = true;
+            police.ramCooldown = 0.8;
+          }
         }
         unit.bustTimer = 0;
       } else {

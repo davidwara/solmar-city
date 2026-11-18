@@ -328,7 +328,7 @@ document.getElementById('restart-button').addEventListener('click', () => {
 });
 
 // Debug handle for headless probes (CDP): window.__solmar.
-window.__solmar = { state, missions, police, traffic, peds };
+window.__solmar = { state, missions, police, traffic, peds, player, cars };
 
 // --- main loop ---------------------------------------------------------------
 const clock = new THREE.Clock();
