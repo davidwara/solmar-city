@@ -3,17 +3,104 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
+<title>Solmar City — Open-World Crime</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
-  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1620;
+    font-family: 'Trebuchet MS', Verdana, sans-serif; color: #fff; }
+  #game { position: fixed; inset: 0; }
+  #game canvas { display: block; }
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 14, 24, 0.55); z-index: 20; }
+  .panel { text-align: center; max-width: 560px; padding: 32px 40px; background: rgba(10, 18, 30, 0.82);
+    border: 2px solid #ff9a3d; border-radius: 14px; }
+  .panel h1 { margin: 0 0 4px; font-size: 54px; letter-spacing: 4px; color: #ffd23f;
+    text-shadow: 0 3px 0 #c23b4e, 0 6px 18px rgba(0,0,0,0.6); }
+  .panel h2 { margin: 0 0 14px; font-size: 15px; letter-spacing: 6px; color: #7df9ff; font-weight: normal; }
+  .panel p { font-size: 15px; line-height: 1.55; color: #e8e8e8; }
+  .controls { text-align: left; display: inline-block; font-size: 14px; line-height: 1.8; color: #cfe3ef; }
+  .controls b { color: #ffd23f; }
+  button { margin-top: 18px; padding: 13px 42px; font-size: 18px; font-weight: bold; letter-spacing: 2px;
+    color: #1a1206; background: #ffd23f; border: none; border-radius: 8px; cursor: pointer; }
+  button:hover { background: #ffdf6b; }
+  /* HUD */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; display: none; }
+  #hud.on { display: block; }
+  #top-right { position: absolute; top: 14px; right: 16px; text-align: right; }
+  #money { font-size: 28px; font-weight: bold; color: #7dff8a; text-shadow: 0 2px 4px #000; }
+  #wanted { font-size: 24px; color: #ffd23f; text-shadow: 0 2px 4px #000; letter-spacing: 2px; }
+  #health-wrap { position: absolute; top: 14px; left: 16px; width: 220px; }
+  #health-label { font-size: 13px; letter-spacing: 2px; color: #ffd9de; text-shadow: 0 1px 3px #000; }
+  #health-bar { height: 14px; background: rgba(0,0,0,0.55); border: 1px solid #fff; border-radius: 7px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff4d6d, #ff8a5c); }
+  #objective { position: absolute; top: 64px; left: 16px; font-size: 15px; color: #fff;
+    background: rgba(0,0,0,0.45); padding: 7px 12px; border-left: 4px solid #ffd23f; border-radius: 4px; }
+  #speed { position: absolute; bottom: 54px; right: 18px; font-size: 26px; font-weight: bold;
+    color: #fff; text-shadow: 0 2px 4px #000; }
+  #hint { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); font-size: 14px;
+    color: #e8f4ff; background: rgba(0,0,0,0.5); padding: 6px 14px; border-radius: 20px; white-space: nowrap; }
+  #minimap { position: absolute; bottom: 16px; left: 16px; width: 190px; height: 190px;
+    border: 2px solid rgba(255,255,255,0.75); border-radius: 8px; background: #101820; }
+  #title-tag { position: absolute; bottom: 16px; right: 16px; font-size: 12px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.65); text-shadow: 0 1px 3px #000; }
 </style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
-<p id="status" role="status" aria-live="polite"></p>
+<div id="game"></div>
+
+<div id="hud">
+  <div id="health-wrap">
+    <div id="health-label">HEALTH <span id="health-text">100</span></div>
+    <div id="health-bar"><div id="health-fill"></div></div>
+  </div>
+  <div id="objective">Meet Rico at the marina — drive south to the pier</div>
+  <div id="top-right">
+    <div id="money">$1,250</div>
+    <div id="wanted">☆☆☆☆☆</div>
+  </div>
+  <canvas id="minimap" width="190" height="190"></canvas>
+  <div id="speed"></div>
+  <div id="hint">WASD move · Shift run · Space jump · E enter car · P pause</div>
+  <div id="title-tag">SOLMAR CITY</div>
+</div>
+
+<div id="start-screen" class="overlay">
+  <div class="panel">
+    <h1>SOLMAR CITY</h1>
+    <h2>AN OPEN-WORLD CRIME STORY</h2>
+    <p>You are <b>Mara Voss</b>, a courier pulled into the Solmar underworld.
+    Explore the sun-soaked coastal city on foot or behind the wheel —
+    steal a car, cruise the beachfront, and meet Rico at the marina.</p>
+    <div class="controls">
+      <b>WASD</b> move / drive &nbsp;·&nbsp; <b>Mouse drag</b> look around<br>
+      <b>Shift</b> run &nbsp;·&nbsp; <b>Space</b> jump &nbsp;·&nbsp; <b>E</b> enter / exit car<br>
+      <b>P</b> pause &nbsp;·&nbsp; <b>Wheel</b> zoom camera
+    </div>
+    <br>
+    <button id="start-button">START ENGINE</button>
+  </div>
+</div>
+
+<div id="pause-screen" class="overlay" style="display:none">
+  <div class="panel">
+    <h1>PAUSED</h1>
+    <p>Solmar City waits for no one — except right now.</p>
+    <button id="resume-button">RESUME</button>
+    <button id="restart-button">RESTART</button>
+  </div>
+</div>
+
 <script type="module" src="./src/main.js"></script>
+<script>
+  // The HUD only shows once the game leaves the start screen.
+  const hud = document.getElementById('hud');
+  const observer = new MutationObserver(() => {
+    hud.classList.toggle('on', document.getElementById('start-screen').style.display === 'none');
+  });
+  observer.observe(document.getElementById('start-screen'), { attributes: true, attributeFilter: ['style'] });
+  hud.classList.toggle('on', document.getElementById('start-screen').style.display === 'none');
+</script>
 </body>
 </html>
