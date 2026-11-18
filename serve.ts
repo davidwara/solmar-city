@@ -8,6 +8,8 @@
 // Phase 3 note: same story — the pistol, day/night cycle, traffic lights,
 // WASTED respawn and the three new jobs are all client-side modules under
 // game/src/, so this server still does nothing but serve static files.
+// Phase 4 note: same again — weather, collectibles, the radio and the
+// three new jobs are plain static ES modules; no new MIME type needed.
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';

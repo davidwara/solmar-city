@@ -3,6 +3,9 @@
 // but every shot in public is a crime — firing near witnesses raises heat,
 // and hitting a patrol car makes the law hunt her harder. Ammo is scarce:
 // a 12-round magazine, spare rounds bought with the gun, R reloads.
+// Phase 4: the pistol shares the C key's neighbourhood, not its job — C is
+// the camera on the Shutterbug tour, so the pistol stays on the mouse click
+// and never fires while Mara is framing a photo.
 import * as THREE from 'three';
 
 export const GUN_PRICE = 400;

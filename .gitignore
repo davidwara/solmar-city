@@ -4,3 +4,5 @@ work-tmp/
 # Phase 3: headless screenshot profiles and the kit's local check output.
 chrome-profile/
 check-out/
+# Phase 4: Phase 4 screenshot staging profiles.
+shot-p4/

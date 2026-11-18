@@ -19,6 +19,9 @@ export function loadSave() {
       timesWasted: typeof data.timesWasted === 'number' ? data.timesWasted : 0,
       timesBusted: typeof data.timesBusted === 'number' ? data.timesBusted : 0,
       shotsFired: typeof data.shotsFired === 'number' ? data.shotsFired : 0,
+      // Phase 4: hidden packages found and Shutterbug photos snapped.
+      packagesCollected: typeof data.packagesCollected === 'number' ? data.packagesCollected : 0,
+      photosTaken: typeof data.photosTaken === 'number' ? data.photosTaken : 0,
     };
   } catch {
     return null;
@@ -37,6 +40,8 @@ export function saveGame(data) {
       timesWasted: data.timesWasted || 0,
       timesBusted: data.timesBusted || 0,
       shotsFired: data.shotsFired || 0,
+      packagesCollected: data.packagesCollected || 0,
+      photosTaken: data.photosTaken || 0,
     }));
     return true;
   } catch {

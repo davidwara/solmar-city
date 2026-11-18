@@ -85,8 +85,8 @@ export function spawnParkedCars(scene, rngSeed) {
   return cars;
 }
 
-export function updateCar(car, dt, input, colliders, bound) {
-  const accel = input.forward ? 16 : 0;
+export function updateCar(car, dt, input, colliders, bound, grip = 1) {
+  const accel = (input.forward ? 16 : 0) * grip;
   const brake = input.back ? 22 : 0;
   const reverse = input.back && car.speed < 0.5 ? 8 : 0;
   car.speed += (accel + reverse - brake * (car.speed > 0 ? 1 : 0)) * dt;
@@ -98,7 +98,7 @@ export function updateCar(car, dt, input, colliders, bound) {
   // Steering scales with speed and flips in reverse.
   const steerTarget = (input.left ? 1 : 0) - (input.right ? 1 : 0);
   car.steer += (steerTarget - car.steer) * Math.min(1, dt * 8);
-  const steerAmount = car.steer * 0.55 * clamp(Math.abs(car.speed) / 8, 0, 1);
+  const steerAmount = car.steer * 0.55 * clamp(Math.abs(car.speed) / 8, 0, 1) * grip;
   car.heading += steerAmount * (car.speed >= 0 ? 1 : -1) * dt * (Math.abs(car.speed) > 0.1 ? 1 : 0);
   car.heading = wrapAngle(car.heading);
   const fx = Math.sin(car.heading);

@@ -3,6 +3,8 @@
 // and she wakes up at St. Solmar Hospital with her jobs intact — the story
 // goes on, but the wallet remembers. Busted and wasted counts are tracked
 // as lifetime stats and shown on the start screen.
+// Phase 4: getting busted or wasted during the Getaway Driver job ends the
+// run the hard way — the 100-second timer only pays out if Mara stays free.
 export const HOSPITAL_POS = { x: 186, z: 124 };
 
 /** Create the wasted system. Returns the overlay + stats + respawn math. */

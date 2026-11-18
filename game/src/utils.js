@@ -23,6 +23,11 @@ export function randInt(rng, min, max) {
   return Math.floor(rand(rng, min, max + 1));
 }
 
+/** True with probability p (0..1) on the given rng — weather rolls on it. */
+export function chance(rng, p) {
+  return rng() < p;
+}
+
 /** Pick one element of an array. */
 export function pick(rng, arr) {
   return arr[Math.floor(rng() * arr.length)];

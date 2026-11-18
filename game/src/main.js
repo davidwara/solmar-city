@@ -7,6 +7,9 @@
 // Phase 3: a pistol from the gun shop, three more jobs (night run,
 // bodyguard, taxi), a WASTED hospital respawn, traffic lights + horns,
 // talking pedestrians, a day/night cycle and a polished HUD.
+// Phase 4: dynamic weather (rain/storms, wet-road grip, lightning),
+// three more jobs (smuggler's run, getaway driver, shutterbug), 15 hidden
+// packages to hunt, and two procedural radio stations while driving.
 import * as THREE from 'three';
 import { buildCity, CITY } from './city.js';
 import { createPlayer, updatePlayer } from './player.js';
@@ -23,6 +26,8 @@ import { stageShot, SHOT_NAMES } from './shots.js';
 import { createWeapons, GUN_PRICE } from './weapons.js';
 import { createDayNight } from './daynight.js';
 import { createWasted, HOSPITAL_POS } from './wasted.js';
+import { createWeather } from './weather.js';
+import { createCollectibles } from './collectibles.js';
 
 const params = new URLSearchParams(window.location.search);
 const shotName = params.get('shot');
@@ -50,6 +55,8 @@ const hud = createHud();
 const weapons = createWeapons(scene);
 const daynight = createDayNight(scene, city);
 const wasted = createWasted();
+const weather = createWeather(scene, city, daynight);
+const collectibles = createCollectibles(scene, seed);
 
 // --- game state ------------------------------------------------------------
 const savedGame = loadSave();
@@ -94,6 +101,8 @@ function persistSave() {
     timesWasted: wasted.timesWasted,
     timesBusted: wasted.timesBusted,
     shotsFired: weapons.shotsFired,
+    packagesCollected: collectibles.count,
+    photosTaken: missions.photosTaken,
   });
 }
 
@@ -116,9 +125,10 @@ function startGame(useSave) {
     wasted.timesWasted = savedGame.timesWasted || 0;
     wasted.timesBusted = savedGame.timesBusted || 0;
     weapons.shotsFired = savedGame.shotsFired || 0;
-    missions.startMission(Math.min(savedGame.missionsCompleted, 5));
+    collectibles.restore(savedGame.packagesCollected || 0);
+    missions.startMission(Math.min(savedGame.missionsCompleted, 8));
     maybeStartNight();
-    toast(`Welcome back, Mara — ${savedGame.missionsCompleted}/6 jobs done.`);
+    toast(`Welcome back, Mara — ${savedGame.missionsCompleted}/9 jobs done.`);
   } else {
     state.money = 1250;
     state.health = 100;
@@ -237,6 +247,40 @@ window.addEventListener('keydown', (e) => {
       toast('You already own the pistol.');
     } else {
       toast('Not enough cash — the pistol is $400.');
+    }
+  }
+  if (e.code === 'KeyQ' && !e.repeat && state.mode === 'playing') {
+    // Radio: only while driving — on foot the streets are the soundtrack.
+    if (!state.inCar) {
+      toast('The radio only plays behind the wheel — steal a car first.');
+      return;
+    }
+    const station = audio.toggleStation();
+    toast(station ? `Radio: ${station}` : 'Radio off');
+  }
+  if (e.code === 'KeyC' && !e.repeat && state.mode === 'playing') {
+    // Shutterbug: snap the scenic spot when Mara is close enough.
+    const m = missions.current();
+    if (!m || m.kind !== 'shutterbug') return;
+    const focusPos = state.inCar ? state.car.pos : player.pos;
+    const ev = missions.snapPhoto(focusPos);
+    if (ev.tooFar) {
+      toast('Get closer to the spot to snap it.');
+      return;
+    }
+    if (ev.photoDone) {
+      state.money += ev.photoReward;
+      audio.shutter();
+      hud.showFlash();
+      toast(`Photo ${missions.photosTaken}/3 — +$${ev.photoReward}`);
+      persistSave();
+    }
+    if (ev.completed) {
+      state.money += ev.reward;
+      audio.jingle();
+      toast(`SHUTTERBUG DONE — all three spots: +$${ev.reward} bonus`);
+      if (!missions.current()) toast('ALL JOBS DONE — Solmar City is yours!');
+      persistSave();
     }
   }
 });
@@ -373,6 +417,8 @@ if (isShot) {
     exitCar,
     daynight,
     weapons,
+    weather,
+    collectibles,
   });
   if (shotName === 'menu') {
     // Menu pose keeps the start screen visible over a sunset vista.
@@ -399,7 +445,7 @@ if (isShot) {
     if (note) {
       note.style.display = 'block';
       const stats = wasted.statsText();
-      note.textContent = `Saved progress: $${savedGame.money.toLocaleString('en-US')} · ${savedGame.missionsCompleted}/6 jobs done${stats ? ' · ' + stats : ''}.`;
+      note.textContent = `Saved progress: $${savedGame.money.toLocaleString('en-US')} · ${savedGame.missionsCompleted}/9 jobs done${stats ? ' · ' + stats : ''}.`;
     }
   }
 }
@@ -419,7 +465,7 @@ document.getElementById('restart-button').addEventListener('click', () => {
 });
 
 // Debug handle for headless probes (CDP): window.__solmar.
-window.__solmar = { state, missions, police, traffic, peds, player, cars, weapons, daynight, wasted };
+window.__solmar = { state, missions, police, traffic, peds, player, cars, weapons, daynight, wasted, weather, collectibles };
 
 // --- main loop ---------------------------------------------------------------
 const clock = new THREE.Clock();
@@ -436,7 +482,7 @@ function frame() {
       weapons.update(dt);
       player.aiming = weapons.owned && !state.inCar;
       if (state.inCar && state.car) {
-        updateCar(state.car, dt, input, city.colliders, CITY.bound);
+        updateCar(state.car, dt, input, city.colliders, CITY.bound, weather.gripFactor());
       } else {
         updatePlayer(player, dt, input, state.cameraYaw, city.colliders, CITY.bound);
       }
@@ -450,6 +496,7 @@ function frame() {
         playerPos: focusPos,
         playerInCar: state.inCar,
         parkedCars: cars,
+        grip: weather.gripFactor(),
       });
       if (traffic.horn) {
         traffic.horn = false;
@@ -462,6 +509,7 @@ function frame() {
         trafficCars: traffic.cars,
         policeCars: police.cars,
         gunshotPos: weapons.lastShotPos,
+        raining: weather.raining,
       });
       weapons.lastShotPos = null; // consumed: peds flee once per shot
       combat.update(dt);
@@ -502,6 +550,15 @@ function frame() {
         toast(`Fare paid — +$${missionEvents.fareReward}`);
         persistSave();
       }
+      if (missionEvents.pickup) {
+        audio.thud();
+        toast('Crate aboard — roadblocks up ahead, the law is on you!');
+      }
+      if (missionEvents.pickup && missionEvents.heat > 0) {
+        // Smuggler's pickup heat (job-start heat still pays in the
+        // completed branch below — this one is only for the crate lift).
+        police.addHeat(missionEvents.heat, focusPos);
+      }
       if (missionEvents.completed) {
         state.money += missionEvents.reward;
         audio.jingle();
@@ -523,6 +580,22 @@ function frame() {
       }
       state.objective = missions.objectiveText(focusPos);
       state.objectivePos = missions.current() ? missions.markerPos : null;
+
+      // --- weather + hidden packages ----------------------------------------
+      weather.update(dt, focusPos, audio);
+      const packEvents = collectibles.update(dt, focusPos);
+      if (packEvents.collected > 0) {
+        state.money += packEvents.collected * 100;
+        audio.chime();
+        toast(`Hidden package found — +$${packEvents.collected * 100} (${collectibles.count}/15)`);
+        persistSave();
+      }
+      if (packEvents.bonus) {
+        state.money += 1000;
+        audio.jingle();
+        toast('ALL 15 PACKAGES — $1,000 completion bonus!');
+        persistSave();
+      }
 
       // --- audio + autosave --------------------------------------------------
       audio.update(dt, {
@@ -565,6 +638,10 @@ function frame() {
     isNight: daynight.isNight,
     shopPos: weapons.shopPos,
     vipPos: missions.current() && missions.current().kind === 'bodyguard' ? missions.vipPos : null,
+    weatherIcon: weather.iconText(),
+    packagesText: collectibles.counterText(),
+    stationText: audio.stationName(),
+    packageDots: collectibles.nearby(state.inCar ? state.car.pos : player.pos),
   });
   renderer.render(scene, camera);
   framesRendered++;

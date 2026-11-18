@@ -4,7 +4,9 @@
 // is exactly what a short game looks like. Nothing here fakes a system —
 // every pose only uses systems that exist in the build (Phase 2: traffic,
 // pedestrians, police pursuit and missions all run live in the shot;
-// Phase 3: the pistol, the night cycle, traffic lights and ped barks).
+// Phase 3: the pistol, the night cycle, traffic lights and ped barks;
+// Phase 4: the mission shot runs the Smuggler's Run in the rain, and the
+// night shot runs a storm with lightning).
 // Poses set the hour through the day/night system, so the HUD clock always
 // agrees with the sky in the frame.
 
@@ -103,38 +105,41 @@ export function stageShot(name, ctx) {
     return 'fixed';
   }
   if (name === 'mission') {
-    // Job 4, the Night Run: Mara on foot at night, pistol in hand, the
-    // gold beacon far down the avenue, a traffic light red overhead and a
-    // resident shouting — night, guns and a timed job in one frame.
-    ctx.daynight.setHours(21.5);
-    missions.startMission(3);
-    ctx.weapons.stageOwned();
-    // Mara on the avenue, facing the beacon, pistol raised.
-    player.pos.set(2, 0, -30);
-    player.heading = 0;
-    player.aiming = true;
-    ctx.exitCar(true);
-    const near = cars[0];
-    near.pos.set(3.5, 0, -16);
-    near.heading = 0;
-    // Parked cars only sync their mesh in updateCar, so place it by hand.
-    near.group.position.set(3.5, 0, -16);
-    near.group.rotation.y = 0;
-    traffic.place(0, -3.5, -90, 'ns', -1, 10);
-    traffic.place(1, 3.5, 30, 'ns', 1, 9);
-    const scared = peds.place(0, 12, -22);
-    peds.bark(scared, 'Help!', 30); // long bubble so the shot catches it
-    peds.place(1, -12, -48);
-    peds.place(2, 12, -58);
-    ctx.setCamera(2, 4.5, -44, 2, 1.6, -30);
+    // Job 7, the Smuggler's Run, in the rain: Mara driving up the avenue
+    // with the crate aboard, a striped roadblock ahead, a hidden package
+    // glowing on the sidewalk, rain falling and the HUD showing the
+    // wet-weather icon and the package counter.
+    ctx.daynight.setHours(16);
+    ctx.weather.setMode('rain');
+    missions.startMission(6);
+    // Stage the pickup as already done: crate aboard, roadblocks up.
+    missions.armSmugglerDelivery();
+    car.pos.set(62, 0, 80);
+    car.heading = 0;
+    car.speed = 10;
+    car.driven = true;
+    ctx.enterCar(car);
+    ctx.collectibles.stageOne(72, 100);
+    traffic.place(0, 58, 140, 'ns', 1, 9);
+    traffic.place(1, -62, 40, 'ns', -1, 10);
+    const scared = peds.place(0, 72, 110);
+    peds.bark(scared, 'Rain again!', 30); // long bubble so the shot catches it
+    peds.place(1, 52, 130);
+    peds.place(2, 72, 140);
+    // Over-the-shoulder from behind Mara's car: the roadblock at (62,124)
+    // sits right down the avenue in front of her.
+    ctx.setCamera(62, 6, 62, 62, 2, 124);
     ctx.setState('playing');
     return 'fixed';
   }
   if (name === 'night') {
-    // Solmar after dark: lamps glowing along the beachfront, the moon up,
-    // Mara's car at the beachfront intersection, downtown towers behind,
-    // traffic cruising with headlights through the night.
+    // Solmar in a storm: lamps glowing along the beachfront, the moon up,
+    // lightning strobing the sky, rain falling, Mara's car at the
+    // beachfront intersection, downtown towers behind, traffic cruising
+    // with headlights through the night.
     ctx.daynight.setHours(22);
+    ctx.weather.setMode('storm');
+    ctx.weather.flashNow();
     missions.startMission(3); // Night Run — the job that starts after dark
     car.pos.set(0, 0, 186);
     car.heading = Math.PI;

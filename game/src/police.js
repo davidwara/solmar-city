@@ -3,6 +3,9 @@
 // raises it; staying out of sight lets it cool off one star at a time.
 // One police car spawns per star and chases Mara: it rams her car, and on
 // foot it can bust her (fine + wanted cleared). Lose them by distance.
+// Phase 4: the Getaway Driver job starts at three stars, and the Smuggler's
+// Run adds heat the moment the crate is lifted — both jobs are won and lost
+// on this pursuit system, with the roadblock barriers as scenery on the run.
 import * as THREE from 'three';
 import { createCar, addLightBar } from './vehicles.js';
 import { CITY, randomRoadPoint } from './city.js';

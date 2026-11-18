@@ -2,6 +2,9 @@
 // WASD moves relative to the camera, Shift runs, Space jumps. The player is
 // a simple articulated figure (torso, head, legs, arms) built from boxes so
 // the game needs no external character model.
+// Phase 4: the Shutterbug job is done on foot too — Mara walks up to a
+// scenic spot and snaps it with C, so the on-foot controller is the camera
+// tripod as much as the getaway legs.
 import * as THREE from 'three';
 import { clamp } from './utils.js';
 

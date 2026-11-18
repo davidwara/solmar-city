@@ -151,7 +151,9 @@ export function spawnTraffic(scene, seed, count = 10) {
       else car.pos.z += (nearestStreet(car.pos.z) + laneTarget - car.pos.z) * Math.min(1, dt * 3);
 
       // Stop for the vehicle ahead (unless overtaking a parked one); creep otherwise.
-      let targetSpeed = (blocker && !parkedBlock) || (blocker && !overtaking) ? 0 : (overtaking ? w.cruise * 0.7 : w.cruise);
+      // Phase 4: rain slows traffic too — wet roads, cautious drivers.
+      const rainGrip = ctx.grip || 1;
+      let targetSpeed = (blocker && !parkedBlock) || (blocker && !overtaking) ? 0 : (overtaking ? w.cruise * 0.7 : w.cruise) * rainGrip;
       // Red light: stop at the line instead of crossing the intersection.
       const light = lightAhead(w);
       const redForMe = light && (w.axis === 'ns' ? !light.nsGreen : !light.ewGreen);

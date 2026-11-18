@@ -23,6 +23,10 @@ export function createHud() {
     missionList: document.getElementById('mission-list'),
     ammo: document.getElementById('ammo'),
     clock: document.getElementById('clock'),
+    weather: document.getElementById('weather'),
+    packages: document.getElementById('packages'),
+    station: document.getElementById('station'),
+    flash: document.getElementById('flash'),
   };
   const ctx = els.minimap.getContext('2d');
   const S = els.minimap.width; // 190
@@ -103,6 +107,12 @@ export function createHud() {
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(vx, vy, 5 + Math.sin(flashPhase * 2) * 1.5, 0, Math.PI * 2); ctx.stroke();
     }
+    // Hidden packages (cyan dots) — only the ones Mara is close to.
+    for (const pos of extra.packages || []) {
+      const [gx, gy] = toMap(pos.x, pos.z);
+      ctx.fillStyle = '#7df9ff';
+      ctx.beginPath(); ctx.arc(gx, gy, 3, 0, Math.PI * 2); ctx.fill();
+    }
     // Player arrow.
     const [px, py] = toMap(playerPos.x, playerPos.z);
     ctx.save();
@@ -122,6 +132,13 @@ export function createHud() {
     els.toast.style.display = 'block';
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { els.toast.style.display = 'none'; }, ms);
+  }
+
+  /** Camera flash for the Shutterbug job: a white blink over the frame. */
+  function showFlash() {
+    if (!els.flash) return;
+    els.flash.style.display = 'block';
+    setTimeout(() => { els.flash.style.display = 'none'; }, 140);
   }
 
   /** Show / hide the jobs (mission list) panel. */
@@ -150,6 +167,10 @@ export function createHud() {
       els.clock.textContent = state.clockText || '';
       els.clock.style.color = state.isNight ? '#9db8ff' : '#ffe9a8';
     }
+    // Phase 4 readouts: weather, hidden-package count, radio station.
+    if (els.weather) els.weather.textContent = state.weatherIcon || '';
+    if (els.packages) els.packages.textContent = state.packagesText || '';
+    if (els.station) els.station.textContent = state.inCar ? (state.stationText || '') : '';
     els.objective.textContent = state.objective;
     els.speed.textContent = state.inCar
       ? Math.round(Math.abs(state.speed) * 3.6) + ' km/h'
@@ -163,10 +184,11 @@ export function createHud() {
       peds: state.peds || [],
       shopPos: state.shopPos || null,
       vipPos: state.vipPos || null,
+      packages: state.packageDots || [],
     });
   }
 
-  return { update, showToast, toggleMissionList };
+  return { update, showToast, toggleMissionList, showFlash };
 }
 
 /** Show or hide the start screen / pause menu overlays. */

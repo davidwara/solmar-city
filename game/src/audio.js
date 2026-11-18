@@ -14,7 +14,19 @@ export function createAudio() {
     sirenGain: null,
     sirenLfo: null,
     stepTimer: 0,
+    // Phase 4 — car radio: 0 off, 1 SOLMAR FM (bassline + hats), 2 NIGHT
+    // TIDE (slow synth pads). Q cycles the station while driving.
+    radioStation: 0,
+    radioStep: 0,
+    radioTimer: 0,
   };
+
+  // Radio stations: name, tempo, and the notes each one leans on.
+  const RADIO = [
+    null,
+    { name: 'SOLMAR FM — Bassline', bpm: 126, bass: [55, 0, 65.41, 0, 49, 0, 58.27, 73.42] },
+    { name: 'NIGHT TIDE — Synth', bpm: 84, bass: [110, 0, 0, 0, 87.31, 0, 0, 0], pad: [220, 261.63, 329.63] },
+  ];
 
   function ensure() {
     if (audio.ctx) {
@@ -138,6 +150,52 @@ export function createAudio() {
     blip(466, 0.28, 'square', 0.14);
   }
 
+  /** Thunder: a low rumble that follows a lightning strike (storms). */
+  function thunder() {
+    ensure();
+    blip(48, 1.4, 'sawtooth', 0.32);
+    blip(62, 1.1, 'triangle', 0.22, 0.12);
+    blip(38, 1.8, 'sine', 0.25, 0.3);
+  }
+
+  /** Camera shutter click for the Shutterbug job (C key). */
+  function shutter() {
+    ensure();
+    blip(2200, 0.04, 'square', 0.18);
+    blip(1300, 0.06, 'square', 0.14, 0.07);
+  }
+
+  /** Cycle the car radio: off -> SOLMAR FM -> NIGHT TIDE -> off. */
+  function toggleStation() {
+    ensure();
+    audio.radioStation = (audio.radioStation + 1) % RADIO.length;
+    audio.radioStep = 0;
+    audio.radioTimer = 0;
+    return stationName();
+  }
+
+  /** Current station name for the HUD ('' means the radio is off). */
+  function stationName() {
+    const st = RADIO[audio.radioStation];
+    return st ? st.name : '';
+  }
+
+  /** One radio step: a bass note, a hat tick, or a pad chord. */
+  function radioStep() {
+    const st = RADIO[audio.radioStation];
+    if (!st) return;
+    const i = audio.radioStep % st.bass.length;
+    const bassNote = st.bass[i];
+    if (bassNote > 0) blip(bassNote, 0.22, 'triangle', 0.2);
+    // Hats on the off-beats keep the bassline moving.
+    if (audio.radioStation === 1 && audio.radioStep % 2 === 1) blip(6000, 0.03, 'square', 0.045);
+    // NIGHT TIDE lays a slow pad over the first beat of each bar.
+    if (audio.radioStation === 2 && audio.radioStep % 8 === 0 && st.pad) {
+      for (const f of st.pad) blip(f, 1.6, 'sine', 0.05);
+    }
+    audio.radioStep += 1;
+  }
+
   /**
    * Per-frame sound: engine pitch from speed, siren while wanted,
    * soft footsteps while Mara runs on foot.
@@ -160,6 +218,15 @@ export function createAudio() {
           blip(140 + Math.random() * 40, 0.05, 'sine', 0.07);
         }
       }
+      // Radio: only while driving, stepped on the station's tempo.
+      if (s.inCar && audio.radioStation > 0) {
+        const st = RADIO[audio.radioStation];
+        audio.radioTimer -= dt;
+        if (audio.radioTimer <= 0) {
+          audio.radioTimer += 60 / st.bpm / 2; // eighth notes
+          radioStep();
+        }
+      }
     } catch { /* never break the game for sound */ }
   }
 
@@ -172,6 +239,10 @@ export function createAudio() {
   audio.dryClick = dryClick;
   audio.reloadClick = reloadClick;
   audio.horn = horn;
+  audio.thunder = thunder;
+  audio.shutter = shutter;
+  audio.toggleStation = toggleStation;
+  audio.stationName = stationName;
   audio.update = update;
   return audio;
 }

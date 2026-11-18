@@ -178,7 +178,7 @@ export function spawnPedestrians(scene, seed, count = 26) {
         pickNewTarget(p);
         continue;
       }
-      const speed = p.fleeTimer > 0 ? 5.2 : p.walkSpeed;
+      const speed = p.fleeTimer > 0 ? 5.2 : p.walkSpeed * (threats.raining ? 0.75 : 1); // rain: residents hurry, heads down
       const wantHeading = Math.atan2(dx, dz);
       let dh = wantHeading - p.heading;
       while (dh > Math.PI) dh -= Math.PI * 2;

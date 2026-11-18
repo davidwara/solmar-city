@@ -20,13 +20,42 @@ stash.
 - **Enter / exit car** — E (stealing a parked car raises your wanted level)
 - **Punch** — F · **Shoot** — mouse click (pistol required) · **Reload** — R
 - **Buy pistol** — G at the gun shop, downtown corner ($400, 12-round mag)
+- **Car radio** — Q while driving (SOLMAR FM bassline / NIGHT TIDE synth)
+- **Snap a photo** — C on the Shutterbug job (get close to the scenic spot)
 - **Mute** — M · **Jobs** — J · **Retry job** — R (when the pistol is full)
 - **Pause** — Esc or P
 - **HUD** — health, money, wanted stars, mission tracker, minimap
-  (traffic, police, pedestrians, mission marker, gun shop, client),
-  pistol ammo, and a day/night clock
+  (traffic, police, pedestrians, mission marker, gun shop, client, hidden
+  packages), pistol ammo, a day/night clock, a weather icon, a package
+  counter, and the radio station while driving
 
-## The living city (Phase 3)
+## The living city (Phase 4)
+
+The sky has a mind of its own now: clear sun gives way to rain and then
+to storms that strobe the city with lightning and roll thunder across the
+avenues. Rain darkens the roads into a wet sheen and costs grip — cars
+accelerate and steer a little worse, traffic slows down, and pedestrians
+hurry with their heads down. The HUD shows the weather (☀ CLEAR / ☂ RAIN /
+⚡ STORM) next to the clock.
+
+Three new jobs bring the total to nine: **Smuggler's Run** (grab the crate
+at the marina pier, then run it to the east docks while striped police
+roadblocks go up on your route, $1,200), **Getaway Driver** (stay free for
+100 seconds at three stars, $1,500), **Shutterbug** (drive to three scenic
+spots — beach, downtown plaza, marina — and snap each one with C, $300 a
+photo plus a $500 bonus for the set).
+
+Fifteen hidden packages are stashed around the city — alleys, beach
+corners, the marina pier, downtown nooks — glowing cyan and bobbing over
+their rings. Walk or drive through one for $100; find all fifteen for a
+$1,000 bonus. The minimap only shows a package once Mara is within 60m,
+so the last few have to be hunted. Package progress saves with the rest of
+her story.
+
+And the car has a radio now: press **Q** while driving to cycle SOLMAR FM
+(a bassline with hats) and NIGHT TIDE (slow synth pads), all procedural
+WebAudio like the rest of the sound. The station name shows on the HUD
+while driving; the radio stays off on foot.
 
 Traffic cruises the avenues and overtakes parked cars — and now it stops
 at red lights at four signalled intersections, and honks when it is stuck
@@ -43,13 +72,16 @@ Health hitting zero means **WASTED** — a red screen, a 10% hospital bill,
 and a wake-up at St. Solmar Hospital with your jobs intact. Busted and
 wasted counts are kept as lifetime stats on the start screen.
 
-Six story jobs pay cash and unlock in order: **First Job** (pick up the
+Nine story jobs pay cash and unlock in order: **First Job** (pick up the
 package at the marina, $250), **Hot Delivery** (deliver downtown while
 wanted, $500), **The Getaway** (reach the beachfront safehouse in 90
 seconds, $750), **Night Run** (a midnight pickup in 2 minutes, starting
 wanted, $900), **Bodyguard** (walk Rico's client across downtown — he only
 moves while you stay close, $1,000), **Taxi King** (three fares against
-the clock, $150 each plus a $400 bonus). A pistol is for sale at the gun
+the clock, $150 each plus a $400 bonus), **Smuggler's Run** (marina pickup
+to the east docks past roadblocks, $1,200), **Getaway Driver** (stay free
+100 seconds at three stars, $1,500), **Shutterbug** (photograph three
+scenic spots, $300 each plus a $500 bonus). A pistol is for sale at the gun
 shop ($400): click to shoot, R to reload — but firing in public raises
 your wanted level, and three hits disable a car outright. Progress, money
 and best wanted level save to the browser (localStorage) — hit **Continue**

@@ -2,6 +2,9 @@
 // Light by design — one punch, one knockdown — but the law notices: every
 // pedestrian put on the ground adds heat to the wanted level. Phase 3 adds
 // the pistol: applyShotHit turns a shot's result into damage and heat.
+// Phase 4: rain changes the roads, not the fists — punches, shots and car
+// hits work the same in a storm, and the Getaway Driver job is won by
+// outrunning these pursuit cars, not by fighting them.
 import { setPunch } from './player.js';
 import { damageCar } from './vehicles.js';
 

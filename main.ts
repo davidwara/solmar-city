@@ -9,6 +9,9 @@
 // Phase 3 note: the dossier now covers three new source modules
 // (weapons.js, daynight.js, wasted.js) and the extended missions, traffic,
 // pedestrians, HUD and shot poses — the build below is what the judge sees.
+// Phase 4: two more source modules (weather.js, collectibles.js), three
+// more jobs (smuggler's run, getaway driver, shutterbug), a car radio in
+// audio.js, and rain/storm screenshot poses — same build, same dossier.
 //
 // The game is plain static files under this directory's game/ folder: a
 // three.js open-world crime game (game/index.html plus its ES modules, no

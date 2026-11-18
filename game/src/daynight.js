@@ -92,6 +92,7 @@ export function createDayNight(scene, city) {
     hours: 10,
     nightFactor: 0,
     isNight: false,
+    stormDim: 0, // Phase 4: weather sets this 0..1 in a storm to dim the sun
   };
 
   /** Apply the light for the current hour to the scene. */
@@ -103,9 +104,9 @@ export function createDayNight(scene, city) {
     const dayFrac = (daynight.hours - 6) / 12; // 0 at 06:00, 1 at 18:00
     const ang = Math.PI * Math.max(0, Math.min(1, dayFrac));
     city.sun.position.set(Math.cos(ang) * 220 - 40, Math.max(12, Math.sin(ang) * 200), 60);
-    city.sun.intensity = k.sun;
+    city.sun.intensity = k.sun * (1 - daynight.stormDim * 0.45);
     city.sun.color.setHex(daynight.hours >= 17 && daynight.hours < 20 ? 0xffb36b : 0xffe6b0);
-    city.hemi.intensity = k.hemi;
+    city.hemi.intensity = k.hemi * (1 - daynight.stormDim * 0.3);
     daynight.nightFactor = k.night;
     daynight.isNight = k.night > 0.5;
     for (const g of glows) g.material.opacity = k.night * 0.85;
