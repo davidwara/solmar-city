@@ -50,6 +50,7 @@ export function createPlayer(scene) {
     walkPhase: 0,
     moving: false,
     running: false,
+    aiming: false, // pistol raised (Phase 3): right arm points forward
     punchTimer: 0, // counts down while the punch animation plays (combat.js)
   };
   group.position.copy(player.pos);
@@ -142,7 +143,10 @@ export function updatePlayer(player, dt, input, cameraYaw, colliders, bound) {
   player.parts.legL.rotation.x = swing;
   player.parts.legR.rotation.x = -swing;
   player.parts.armL.rotation.x = -swing * 0.8;
-  if (player.punchTimer > 0) {
+  if (player.aiming) {
+    // Pistol raised: right arm points where Mara faces, steady.
+    player.parts.armR.rotation.x = -1.35;
+  } else if (player.punchTimer > 0) {
     player.punchTimer -= dt;
     // Right arm snaps forward, then drops back as the timer runs out.
     player.parts.armR.rotation.x = -1.5 * Math.sin((0.35 - Math.max(0, player.punchTimer)) / 0.35 * Math.PI);

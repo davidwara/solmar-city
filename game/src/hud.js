@@ -2,7 +2,10 @@
 // The minimap is a top-down canvas: roads, beach, sea, the player arrow,
 // parked cars, moving traffic (grey), police (flashing blue/red), nearby
 // pedestrians (tiny dots) and the current mission marker (gold diamond).
+// Phase 3 adds the pistol ammo counter, the day/night clock, a flashing
+// wanted display, and gun-shop + bodyguard-client markers on the minimap.
 import { CITY } from './city.js';
+import { clamp01 } from './utils.js';
 
 const STREETS = CITY.streets;
 
@@ -18,6 +21,8 @@ export function createHud() {
     minimap: document.getElementById('minimap'),
     toast: document.getElementById('toast'),
     missionList: document.getElementById('mission-list'),
+    ammo: document.getElementById('ammo'),
+    clock: document.getElementById('clock'),
   };
   const ctx = els.minimap.getContext('2d');
   const S = els.minimap.width; // 190
@@ -85,6 +90,19 @@ export function createHud() {
       ctx.fillStyle = Math.sin(flashPhase * 3) > 0 ? '#3d7bff' : '#ff3d3d';
       ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
     }
+    // Gun shop (green square) — the pistol lives here.
+    if (extra.shopPos) {
+      const [sx, sy] = toMap(extra.shopPos.x, extra.shopPos.z);
+      ctx.fillStyle = '#7dff8a';
+      ctx.fillRect(sx - 3.5, sy - 3.5, 7, 7);
+    }
+    // Bodyguard client (gold ring) — keep him in sight.
+    if (extra.vipPos) {
+      const [vx, vy] = toMap(extra.vipPos.x, extra.vipPos.z);
+      ctx.strokeStyle = '#ffd23f';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(vx, vy, 5 + Math.sin(flashPhase * 2) * 1.5, 0, Math.PI * 2); ctx.stroke();
+    }
     // Player arrow.
     const [px, py] = toMap(playerPos.x, playerPos.z);
     ctx.save();
@@ -119,21 +137,32 @@ export function createHud() {
     els.healthFill.style.width = Math.max(0, state.health) + '%';
     els.healthText.textContent = Math.round(state.health);
     els.money.textContent = '$' + state.money.toLocaleString('en-US');
-    // Wanted: up to 3 stars shine red-hot, the rest stay empty.
+    // Wanted: up to 3 stars shine red-hot, the rest stay empty. While the
+    // law is on Mara the whole row pulses so it cannot be missed.
     const stars = '★'.repeat(state.wanted) + '☆'.repeat(5 - state.wanted);
     els.wanted.textContent = stars;
     els.wanted.style.color = state.wanted > 0 ? '#ff5a5a' : '#ffd23f';
+    els.wanted.style.opacity = state.wanted > 0 ? 0.65 + 0.35 * clamp01(Math.abs(Math.sin(flashPhase * 2))) : 1;
+    els.wanted.classList.toggle('flash', state.wanted > 0);
+    // Phase 3 readouts: pistol ammo (or the shop hint) and the clock.
+    if (els.ammo) els.ammo.textContent = state.ammoText || '';
+    if (els.clock) {
+      els.clock.textContent = state.clockText || '';
+      els.clock.style.color = state.isNight ? '#9db8ff' : '#ffe9a8';
+    }
     els.objective.textContent = state.objective;
     els.speed.textContent = state.inCar
       ? Math.round(Math.abs(state.speed) * 3.6) + ' km/h'
       : '';
     els.hint.textContent = state.inCar
       ? 'WASD drive · E exit car · F punch · M mute · J jobs · P pause'
-      : (state.nearCar ? 'E — take the car · F punch · M mute · J jobs' : 'WASD move · Shift run · Space jump · E enter car · F punch · M mute · J jobs · P pause');
+      : (state.nearCar ? 'E — take the car · F punch · Click shoot · R reload · M mute · J jobs' : state.nearShop ? 'G — buy pistol $400 · WASD move · Shift run · Space jump · F punch · M mute · J jobs · P pause' : 'WASD move · Shift run · Space jump · E enter car · F punch · Click shoot · M mute · J jobs · P pause');
     drawMinimap(state.playerPos, state.heading, state.cars, state.inCar, state.objectivePos, {
       traffic: state.traffic || [],
       police: state.police || [],
       peds: state.peds || [],
+      shopPos: state.shopPos || null,
+      vipPos: state.vipPos || null,
     });
   }
 

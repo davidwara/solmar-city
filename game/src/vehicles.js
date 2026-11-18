@@ -58,7 +58,16 @@ export function createCar(scene, x, z, heading, color) {
     steer: 0,
     color,
     driven: false,
+    hp: 3, // gunfire damage: 0 = disabled, engine dead
   };
+}
+
+/** Damage a car by n hits; at 0 hp it stops dead (smoke not modelled). */
+export function damageCar(car, n = 1) {
+  if (!car || typeof car.hp !== 'number') return false;
+  car.hp = Math.max(0, car.hp - n);
+  if (car.hp === 0) car.speed = 0;
+  return car.hp === 0;
 }
 
 /** Park a row of cars along the roads so the player can steal one. */

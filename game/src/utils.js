@@ -32,6 +32,11 @@ export function clamp(v, min, max) {
   return v < min ? min : v > max ? max : v;
 }
 
+/** Clamp to 0..1 (used for flash / fade intensities). */
+export function clamp01(v) {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
 export function lerp(a, b, t) {
   return a + (b - a) * t;
 }

@@ -30,6 +30,77 @@ export function spawnTraffic(scene, seed, count = 10) {
     syncMesh(cars[i]);
   }
 
+  // --- Traffic lights -----------------------------------------------------
+  // Four signalled intersections. Each light runs its own cycle: north-south
+  // green for 8s, amber 1.5s, then east-west green 8s, amber 1.5s. AI cars
+  // stop on red for their axis; the player is free to run it (and pay for
+  // it, if the law sees). Lights are built from the same boxes as the city.
+  const lights = [];
+  const LIGHT_SPOTS = [[0, 0], [62, 62], [-62, -62], [0, 124]];
+  for (const [lx, lz] of LIGHT_SPOTS) {
+    const group = new THREE.Group();
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.15, 7, 6),
+      new THREE.MeshLambertMaterial({ color: 0x2e3438 }),
+    );
+    pole.position.y = 3.5;
+    group.add(pole);
+    const head = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 2.1, 0.7),
+      new THREE.MeshLambertMaterial({ color: 0x1c1f24 }),
+    );
+    head.position.y = 7.2;
+    group.add(head);
+    const lampGeo = new THREE.SphereGeometry(0.26, 8, 6);
+    const redMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+    const amberMat = new THREE.MeshBasicMaterial({ color: 0x552200 });
+    const greenMat = new THREE.MeshBasicMaterial({ color: 0x115511 });
+    const red = new THREE.Mesh(lampGeo, redMat);
+    red.position.y = 7.9;
+    group.add(red);
+    const amber = new THREE.Mesh(lampGeo, amberMat);
+    amber.position.y = 7.2;
+    group.add(amber);
+    const green = new THREE.Mesh(lampGeo, greenMat);
+    green.position.y = 6.5;
+    group.add(green);
+    group.position.set(lx + 9, 0, lz + 9);
+    scene.add(group);
+    lights.push({ x: lx, z: lz, timer: rand(rng, 0, 8), nsGreen: true, redMat, amberMat, greenMat });
+  }
+
+  // Advance every light one step and paint its lamps.
+  function updateLights(dt) {
+    for (const l of lights) {
+      l.timer += dt;
+      const cycle = l.timer % 19; // 8 green + 1.5 amber, twice
+      const nsPhase = cycle < 9.5;
+      const nsGreen = nsPhase && cycle < 8;
+      const nsAmber = nsPhase && cycle >= 8;
+      const ewGreen = !nsPhase && cycle < 17.5;
+      const ewAmber = !nsPhase && cycle >= 17.5;
+      l.nsGreen = nsGreen;
+      l.redMat.color.setHex(nsGreen || nsAmber ? 0x551111 : 0xff2222);
+      l.amberMat.color.setHex(nsAmber ? 0xffaa22 : 0x552200);
+      l.greenMat.color.setHex(nsGreen ? 0x22ff66 : 0x115511);
+      l.ewGreen = ewGreen;
+      l.ewAmber = ewAmber;
+    }
+  }
+
+  // The light this car is about to cross, if any (within 16m ahead).
+  function lightAhead(w) {
+    const car = w.car;
+    for (const l of lights) {
+      const along = w.axis === 'ns' ? l.z - car.pos.z : l.x - car.pos.x;
+      const cross = w.axis === 'ns' ? Math.abs(l.x - car.pos.x) : Math.abs(l.z - car.pos.z);
+      if (w.dir > 0 ? along > 0 && along < 16 : along < 0 && along > -16) {
+        if (cross < 8) return l;
+      }
+    }
+    return null;
+  }
+
   // Put a traffic wrapper's mesh exactly where its logic says it is.
   function syncMesh(w) {
     w.car.group.position.copy(w.car.pos);
@@ -59,6 +130,7 @@ export function spawnTraffic(scene, seed, count = 10) {
    *   queues behind Mara instead of driving through her.
    */
   function update(dt, ctx) {
+    updateLights(dt);
     const obstacles = [];
     for (const w of cars) obstacles.push(w.car);
     if (ctx.playerInCar && ctx.playerCar) obstacles.push(ctx.playerCar);
@@ -79,7 +151,22 @@ export function spawnTraffic(scene, seed, count = 10) {
       else car.pos.z += (nearestStreet(car.pos.z) + laneTarget - car.pos.z) * Math.min(1, dt * 3);
 
       // Stop for the vehicle ahead (unless overtaking a parked one); creep otherwise.
-      const targetSpeed = (blocker && !parkedBlock) || (blocker && !overtaking) ? 0 : (overtaking ? w.cruise * 0.7 : w.cruise);
+      let targetSpeed = (blocker && !parkedBlock) || (blocker && !overtaking) ? 0 : (overtaking ? w.cruise * 0.7 : w.cruise);
+      // Red light: stop at the line instead of crossing the intersection.
+      const light = lightAhead(w);
+      const redForMe = light && (w.axis === 'ns' ? !light.nsGreen : !light.ewGreen);
+      if (redForMe) targetSpeed = 0;
+      // Horn: stuck behind someone (or a red light queue) for a while and
+      // the driver loses patience. Main plays the sound, once per honk.
+      if (blocker && !parkedBlock && w.speed < 0.5) {
+        w.blockedTimer = (w.blockedTimer || 0) + dt;
+        if (w.blockedTimer > 2.5) {
+          w.blockedTimer = -4; // cooldown before the next honk
+          traffic.horn = true;
+        }
+      } else if ((w.blockedTimer || 0) > 0) {
+        w.blockedTimer = 0;
+      }
       w.speed += (targetSpeed - w.speed) * Math.min(1, dt * 2.5);
 
       // Heading follows axis + direction, eased so turns look like turns.
@@ -143,7 +230,8 @@ export function spawnTraffic(scene, seed, count = 10) {
     return w;
   }
 
-  return { cars, update, place };
+  const traffic = { cars, update, place, lights, horn: false };
+  return traffic;
 }
 
 /** True when the player's car freshly overlaps a traffic car (crash). */

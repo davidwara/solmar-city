@@ -123,6 +123,12 @@ export function createPolice(scene, seed) {
     let nearestDist = Infinity;
     for (const unit of police.cars) {
       const car = unit.car;
+      // A disabled patrol car (shot 3 times) is out of the chase.
+      if (typeof car.hp === 'number' && car.hp <= 0) {
+        unit.speed = 0;
+        car.speed = 0;
+        continue;
+      }
       const dx = target.x - car.pos.x;
       const dz = target.z - car.pos.z;
       const dist = Math.hypot(dx, dz);

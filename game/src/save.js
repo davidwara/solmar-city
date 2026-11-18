@@ -16,6 +16,9 @@ export function loadSave() {
       bestWanted: typeof data.bestWanted === 'number' ? data.bestWanted : 0,
       health: typeof data.health === 'number' ? data.health : 100,
       savedAt: typeof data.savedAt === 'number' ? data.savedAt : 0,
+      timesWasted: typeof data.timesWasted === 'number' ? data.timesWasted : 0,
+      timesBusted: typeof data.timesBusted === 'number' ? data.timesBusted : 0,
+      shotsFired: typeof data.shotsFired === 'number' ? data.shotsFired : 0,
     };
   } catch {
     return null;
@@ -31,6 +34,9 @@ export function saveGame(data) {
       bestWanted: data.bestWanted,
       health: data.health,
       savedAt: Date.now(),
+      timesWasted: data.timesWasted || 0,
+      timesBusted: data.timesBusted || 0,
+      shotsFired: data.shotsFired || 0,
     }));
     return true;
   } catch {

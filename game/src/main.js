@@ -4,8 +4,11 @@
 // once the scene has settled, so headless Chrome can capture it.
 // Phase 2: the city is alive — traffic, pedestrians, police/wanted,
 // three story missions, melee combat, procedural audio and saves.
+// Phase 3: a pistol from the gun shop, three more jobs (night run,
+// bodyguard, taxi), a WASTED hospital respawn, traffic lights + horns,
+// talking pedestrians, a day/night cycle and a polished HUD.
 import * as THREE from 'three';
-import { buildCity, setTimeOfDay, CITY } from './city.js';
+import { buildCity, CITY } from './city.js';
 import { createPlayer, updatePlayer } from './player.js';
 import { spawnParkedCars, updateCar, nearestCar } from './vehicles.js';
 import { spawnTraffic, trafficCrash } from './traffic.js';
@@ -17,6 +20,9 @@ import { createAudio } from './audio.js';
 import { loadSave, saveGame, hasSave, clearSave } from './save.js';
 import { createHud, showScreen } from './hud.js';
 import { stageShot, SHOT_NAMES } from './shots.js';
+import { createWeapons, GUN_PRICE } from './weapons.js';
+import { createDayNight } from './daynight.js';
+import { createWasted, HOSPITAL_POS } from './wasted.js';
 
 const params = new URLSearchParams(window.location.search);
 const shotName = params.get('shot');
@@ -41,6 +47,9 @@ const missions = createMissions(scene);
 const combat = createCombat();
 const audio = createAudio();
 const hud = createHud();
+const weapons = createWeapons(scene);
+const daynight = createDayNight(scene, city);
+const wasted = createWasted();
 
 // --- game state ------------------------------------------------------------
 const savedGame = loadSave();
@@ -82,11 +91,20 @@ function persistSave() {
     missionsCompleted: missions.completed,
     bestWanted: state.bestWanted,
     health: state.health,
+    timesWasted: wasted.timesWasted,
+    timesBusted: wasted.timesBusted,
+    shotsFired: weapons.shotsFired,
   });
 }
 
 function toast(text) {
   hud.showToast(text);
+}
+
+/** Night jobs start after dark: jump the clock to 21:00 when one begins. */
+function maybeStartNight() {
+  const m = missions.current();
+  if (m && m.night) daynight.setHours(21);
 }
 
 function startGame(useSave) {
@@ -95,8 +113,12 @@ function startGame(useSave) {
     state.money = savedGame.money;
     state.health = savedGame.health;
     state.bestWanted = savedGame.bestWanted;
-    missions.startMission(Math.min(savedGame.missionsCompleted, 2));
-    toast(`Welcome back, Mara — ${savedGame.missionsCompleted}/3 jobs done.`);
+    wasted.timesWasted = savedGame.timesWasted || 0;
+    wasted.timesBusted = savedGame.timesBusted || 0;
+    weapons.shotsFired = savedGame.shotsFired || 0;
+    missions.startMission(Math.min(savedGame.missionsCompleted, 5));
+    maybeStartNight();
+    toast(`Welcome back, Mara — ${savedGame.missionsCompleted}/6 jobs done.`);
   } else {
     state.money = 1250;
     state.health = 100;
@@ -109,6 +131,7 @@ function startGame(useSave) {
 }
 
 function handleBusted() {
+  wasted.countBusted();
   police.setWanted(0, player.pos);
   state.money = Math.max(0, state.money - 150);
   if (state.car) exitCar(true);
@@ -121,15 +144,47 @@ function handleBusted() {
 }
 
 function handleWasted() {
+  if (state.mode === 'wasted') return;
+  const bill = wasted.hospitalBill(state.money);
+  state.money = Math.max(0, state.money - bill);
   police.setWanted(0, player.pos);
-  state.money = Math.max(0, state.money - 200);
   if (state.car) exitCar(true);
-  player.pos.set(0, 0, -20);
-  player.group.position.copy(player.pos);
-  state.health = 100;
-  toast('WASTED! The crew patched you up — $200.');
+  state.mode = 'wasted';
   audio.thud();
-  persistSave();
+  wasted.showWasted(() => {
+    player.pos.set(HOSPITAL_POS.x, 0, HOSPITAL_POS.z);
+    player.group.position.copy(player.pos);
+    state.health = 100;
+    state.mode = 'playing';
+    toast(`WASTED! St. Solmar patched you up — $${bill}.`);
+    persistSave();
+  });
+}
+
+/** Fire the pistol (mouse click on foot): tracer, sound, damage, heat. */
+function fireShot() {
+  const hit = weapons.shoot(player.pos, player.heading, { peds, traffic, police });
+  if (!hit) return;
+  if (hit.kind === 'dry') {
+    audio.dryClick();
+    toast('Empty — R to reload.');
+    return;
+  }
+  audio.gunshot();
+  if (hit.kind === 'none') {
+    // A shot in public still draws attention if anyone is close enough.
+    const witness = peds.nearest(player.pos, 30);
+    if (witness) {
+      police.addHeat(1, player.pos);
+      toast('Shots fired in public — the law noticed! +1★');
+    }
+    return;
+  }
+  const heat = combat.applyShotHit(hit);
+  if (heat > 0) police.addHeat(heat, player.pos);
+  if (hit.kind === 'ped') toast('You shot a pedestrian — the law noticed! +1★');
+  else if (hit.kind === 'traffic') toast('You shot a car — the law noticed! +1★');
+  else if (hit.kind === 'police') toast('You shot a patrol car! +2★');
 }
 
 window.addEventListener('keydown', (e) => {
@@ -157,8 +212,32 @@ window.addEventListener('keydown', (e) => {
     hud.toggleMissionList(missions.listText());
   }
   if (e.code === 'KeyR' && !e.repeat && state.mode === 'playing') {
-    missions.restartCurrent();
-    toast('Job restarted — back to the marker.');
+    // R reloads the pistol when it can; otherwise it retries the job.
+    if (!state.inCar && weapons.owned && weapons.reload()) {
+      audio.reloadClick();
+      toast('Reloading…');
+    } else {
+      missions.restartCurrent();
+      maybeStartNight();
+      toast('Job restarted — back to the marker.');
+    }
+  }
+  if (e.code === 'KeyG' && !e.repeat && state.mode === 'playing' && !state.inCar) {
+    if (!weapons.nearShop(player.pos)) {
+      toast('Gun shop is on the downtown corner — look for the green sign.');
+      return;
+    }
+    const res = weapons.buy(state.money);
+    if (res === 'ok') {
+      state.money -= GUN_PRICE;
+      audio.chime();
+      toast('Pistol bought — click to shoot, R to reload.');
+      persistSave();
+    } else if (res === 'owned') {
+      toast('You already own the pistol.');
+    } else {
+      toast('Not enough cash — the pistol is $400.');
+    }
   }
 });
 window.addEventListener('keyup', (e) => {
@@ -166,10 +245,16 @@ window.addEventListener('keyup', (e) => {
 });
 
 // Mouse orbit: drag to look around. Wheel zooms the chase camera.
+// Click (on foot, pistol owned) fires the pistol.
 let dragging = false;
 let lastX = 0;
 let lastY = 0;
-renderer.domElement.addEventListener('mousedown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+renderer.domElement.addEventListener('mousedown', (e) => {
+  dragging = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  if (state.mode === 'playing' && !state.inCar && weapons.owned) fireShot();
+});
 window.addEventListener('mouseup', () => { dragging = false; });
 window.addEventListener('mousemove', (e) => {
   if (!dragging || state.cameraMode === 'fixed') return;
@@ -286,6 +371,8 @@ if (isShot) {
     },
     enterCar,
     exitCar,
+    daynight,
+    weapons,
   });
   if (shotName === 'menu') {
     // Menu pose keeps the start screen visible over a sunset vista.
@@ -294,13 +381,15 @@ if (isShot) {
     state.cameraMode = 'chase';
   }
 } else {
-  setTimeOfDay(scene, city, 0);
+  daynight.setHours(10);
   showScreen('start-screen');
   // Slow menu orbit behind the start screen.
   state.cameraMode = 'fixed';
   state.fixedCam = { pos: new THREE.Vector3(60, 34, 90), look: new THREE.Vector3(0, 14, 0) };
   // Offer Continue when a save exists.
   if (hasSave() && savedGame) {
+    wasted.timesWasted = savedGame.timesWasted || 0;
+    wasted.timesBusted = savedGame.timesBusted || 0;
     const btn = document.getElementById('continue-button');
     const note = document.getElementById('save-note');
     if (btn) {
@@ -309,7 +398,8 @@ if (isShot) {
     }
     if (note) {
       note.style.display = 'block';
-      note.textContent = `Saved progress: $${savedGame.money.toLocaleString('en-US')} · ${savedGame.missionsCompleted}/3 jobs done.`;
+      const stats = wasted.statsText();
+      note.textContent = `Saved progress: $${savedGame.money.toLocaleString('en-US')} · ${savedGame.missionsCompleted}/6 jobs done${stats ? ' · ' + stats : ''}.`;
     }
   }
 }
@@ -323,12 +413,13 @@ document.getElementById('restart-button').addEventListener('click', () => {
   state.health = 100;
   police.setWanted(0, player.pos);
   missions.restartCurrent();
+  maybeStartNight();
   state.mode = 'playing';
   showScreen(null);
 });
 
 // Debug handle for headless probes (CDP): window.__solmar.
-window.__solmar = { state, missions, police, traffic, peds, player, cars };
+window.__solmar = { state, missions, police, traffic, peds, player, cars, weapons, daynight, wasted };
 
 // --- main loop ---------------------------------------------------------------
 const clock = new THREE.Clock();
@@ -339,12 +430,18 @@ function frame() {
     if (state.mode === 'playing') {
       // Screenshot poses hold the throttle so the drive shot stays in motion.
       if (isShot && shotName === 'drive') input.forward = true;
+      // Day/night clock runs in play (frozen for screenshot poses, whose
+      // stage sets the hour directly) and the pistol animates its tracer.
+      if (!isShot) daynight.update(dt);
+      weapons.update(dt);
+      player.aiming = weapons.owned && !state.inCar;
       if (state.inCar && state.car) {
         updateCar(state.car, dt, input, city.colliders, CITY.bound);
       } else {
         updatePlayer(player, dt, input, state.cameraYaw, city.colliders, CITY.bound);
       }
       state.nearCar = state.inCar ? null : nearestCar(cars, player.pos, 4.5);
+      state.nearShop = !state.inCar && weapons.nearShop(player.pos);
 
       // --- the living city -------------------------------------------------
       const focusPos = state.inCar ? state.car.pos : player.pos;
@@ -354,13 +451,19 @@ function frame() {
         playerInCar: state.inCar,
         parkedCars: cars,
       });
+      if (traffic.horn) {
+        traffic.horn = false;
+        audio.horn();
+      }
       peds.update(dt, {
         playerPos: player.pos,
         playerCar: state.car,
         playerInCar: state.inCar,
         trafficCars: traffic.cars,
         policeCars: police.cars,
+        gunshotPos: weapons.lastShotPos,
       });
+      weapons.lastShotPos = null; // consumed: peds flee once per shot
       combat.update(dt);
       if (crashCooldown.value > 0) crashCooldown.value -= dt;
 
@@ -393,6 +496,12 @@ function frame() {
 
       // --- missions ----------------------------------------------------------
       const missionEvents = missions.update(dt, focusPos);
+      if (missionEvents.fareDone) {
+        state.money += missionEvents.fareReward;
+        audio.chime();
+        toast(`Fare paid — +$${missionEvents.fareReward}`);
+        persistSave();
+      }
       if (missionEvents.completed) {
         state.money += missionEvents.reward;
         audio.jingle();
@@ -400,6 +509,10 @@ function frame() {
         if (missionEvents.heat > 0) {
           police.addHeat(missionEvents.heat, focusPos);
           toast('The law is on you — deliver it anyway!');
+        }
+        if (missions.current() && missions.current().night) {
+          daynight.setHours(21);
+          toast('Night falls — the Night Run starts after dark.');
         }
         if (!missions.current()) toast('ALL JOBS DONE — Solmar City is yours!');
         persistSave();
@@ -425,6 +538,8 @@ function frame() {
         persistSave();
       }
     }
+    // The WASTED overlay counts down outside the playing state.
+    if (state.mode === 'wasted') wasted.update(dt);
   } catch (err) {
     window.__shotError = String(err && err.message ? err.message : err);
   }
@@ -441,9 +556,15 @@ function frame() {
     heading: state.inCar ? state.car.heading : player.heading,
     cars,
     nearCar: state.nearCar,
+    nearShop: state.nearShop,
     traffic: traffic.cars,
     police: police.cars,
     peds: peds.peds,
+    ammoText: weapons.ammoText(),
+    clockText: daynight.clockText(),
+    isNight: daynight.isNight,
+    shopPos: weapons.shopPos,
+    vipPos: missions.current() && missions.current().kind === 'bodyguard' ? missions.vipPos : null,
   });
   renderer.render(scene, camera);
   framesRendered++;

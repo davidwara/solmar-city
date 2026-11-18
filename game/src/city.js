@@ -260,7 +260,7 @@ export function buildCity(scene, seed) {
     scene.add(boat);
   }
 
-  return { colliders, landmarks, sun, hemi };
+  return { colliders, landmarks, sun, hemi, lampMat };
 }
 
 /** Move the sun / sky for a time of day: 0 = midday, 1 = golden sunset. */

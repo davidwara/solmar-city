@@ -28,6 +28,13 @@
   #top-right { position: absolute; top: 14px; right: 16px; text-align: right; }
   #money { font-size: 28px; font-weight: bold; color: #7dff8a; text-shadow: 0 2px 4px #000; }
   #wanted { font-size: 24px; color: #ffd23f; text-shadow: 0 2px 4px #000; letter-spacing: 2px; }
+  #wanted.flash { animation: wantedpulse 0.7s infinite; }
+  @keyframes wantedpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+  #clock { font-size: 16px; font-weight: bold; letter-spacing: 2px; color: #ffe9a8; text-shadow: 0 2px 4px #000; }
+  #ammo { position: absolute; bottom: 92px; right: 18px; font-size: 20px; font-weight: bold;
+    color: #ffd23f; text-shadow: 0 2px 4px #000; }
+  #wasted-screen { display: none; background: rgba(120, 0, 0, 0.55); }
+  #wasted-screen h1 { color: #ff5a5a; text-shadow: 0 3px 0 #5a0000, 0 6px 18px rgba(0,0,0,0.6); }
   #health-wrap { position: absolute; top: 14px; left: 16px; width: 220px; }
   #health-label { font-size: 13px; letter-spacing: 2px; color: #ffd9de; text-shadow: 0 1px 3px #000; }
   #health-bar { height: 14px; background: rgba(0,0,0,0.55); border: 1px solid #fff; border-radius: 7px; overflow: hidden; }
@@ -70,8 +77,10 @@
   <div id="top-right">
     <div id="money">$1,250</div>
     <div id="wanted">☆☆☆☆☆</div>
+    <div id="clock">10:00</div>
   </div>
   <canvas id="minimap" width="190" height="190"></canvas>
+  <div id="ammo"></div>
   <div id="speed"></div>
   <div id="hint">WASD move · Shift run · Space jump · E enter car · P pause</div>
   <div id="title-tag">SOLMAR CITY</div>
@@ -83,11 +92,14 @@
     <h2>AN OPEN-WORLD CRIME STORY</h2>
     <p>You are <b>Mara Voss</b>, a courier pulled into the Solmar underworld.
     Explore the sun-soaked coastal city on foot or behind the wheel —
-    steal a car, cruise the beachfront, dodge the law, and run three jobs
-    for Rico — the streets, the traffic and the police are all live.</p>
+    steal a car, cruise the beachfront, dodge the law, and run six jobs
+    for Rico — the streets, the traffic and the police are all live. Buy a
+    pistol at the gun shop, work the night shift, guard a client, and drive
+    a taxi when the money runs thin.</p>
     <div class="controls">
       <b>WASD</b> move / drive &nbsp;·&nbsp; <b>Mouse drag</b> look around<br>
       <b>Shift</b> run &nbsp;·&nbsp; <b>Space</b> jump &nbsp;·&nbsp; <b>E</b> enter / exit car<br>
+      <b>Click</b> shoot &nbsp;·&nbsp; <b>R</b> reload &nbsp;·&nbsp; <b>G</b> buy pistol ($400)<br>
       <b>F</b> punch &nbsp;·&nbsp; <b>M</b> mute &nbsp;·&nbsp; <b>J</b> jobs &nbsp;·&nbsp; <b>R</b> retry job<br>
       <b>P</b> pause &nbsp;·&nbsp; <b>Wheel</b> zoom camera
     </div>
@@ -102,8 +114,21 @@
   <div class="panel">
     <h1>PAUSED</h1>
     <p>Solmar City waits for no one — except right now.</p>
+    <div class="controls">
+      <b>WASD</b> move / drive &nbsp;·&nbsp; <b>Click</b> shoot &nbsp;·&nbsp; <b>R</b> reload<br>
+      <b>G</b> buy pistol ($400) &nbsp;·&nbsp; <b>F</b> punch &nbsp;·&nbsp; <b>E</b> enter / exit car<br>
+      <b>J</b> jobs &nbsp;·&nbsp; <b>M</b> mute &nbsp;·&nbsp; <b>P</b> resume
+    </div>
+    <br>
     <button id="resume-button">RESUME</button>
     <button id="restart-button">RESTART</button>
+  </div>
+</div>
+
+<div id="wasted-screen" class="overlay">
+  <div class="panel">
+    <h1>WASTED</h1>
+    <p>Mara went down. St. Solmar Hospital patched her up — for 10% of her cash.</p>
   </div>
 </div>
 

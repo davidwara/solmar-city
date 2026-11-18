@@ -5,6 +5,9 @@
 // Phase 2 note: the game is still plain static files — serve.ts needed no
 // functional change, only this comment, because nothing about the new
 // traffic / police / mission / audio / save systems needs the network.
+// Phase 3 note: same story — the pistol, day/night cycle, traffic lights,
+// WASTED respawn and the three new jobs are all client-side modules under
+// game/src/, so this server still does nothing but serve static files.
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';

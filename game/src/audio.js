@@ -111,6 +111,33 @@ export function createAudio() {
     blip(60, 0.22, 'triangle', 0.3, 0.02);
   }
 
+  /** Pistol shot: a sharp crack (noise burst via a fast square blip). */
+  function gunshot() {
+    ensure();
+    blip(180, 0.09, 'square', 0.4);
+    blip(90, 0.14, 'sawtooth', 0.3, 0.01);
+  }
+
+  /** Dry click when the magazine is empty. */
+  function dryClick() {
+    ensure();
+    blip(1200, 0.04, 'square', 0.12);
+  }
+
+  /** Reload click-clack: two short metallic ticks. */
+  function reloadClick() {
+    ensure();
+    blip(900, 0.05, 'square', 0.15);
+    blip(700, 0.05, 'square', 0.15, 0.18);
+  }
+
+  /** Car horn: two-tone beep, the sound of Solmar traffic losing patience. */
+  function horn() {
+    ensure();
+    blip(370, 0.28, 'square', 0.16);
+    blip(466, 0.28, 'square', 0.14);
+  }
+
   /**
    * Per-frame sound: engine pitch from speed, siren while wanted,
    * soft footsteps while Mara runs on foot.
@@ -141,6 +168,10 @@ export function createAudio() {
   audio.chime = chime;
   audio.jingle = jingle;
   audio.thud = thud;
+  audio.gunshot = gunshot;
+  audio.dryClick = dryClick;
+  audio.reloadClick = reloadClick;
+  audio.horn = horn;
   audio.update = update;
   return audio;
 }

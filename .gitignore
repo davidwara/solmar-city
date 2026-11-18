@@ -1,3 +1,6 @@
 out/
 # Phase 2: local playtest output and per-shot browser profiles stay out of git.
 work-tmp/
+# Phase 3: headless screenshot profiles and the kit's local check output.
+chrome-profile/
+check-out/

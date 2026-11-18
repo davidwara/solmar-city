@@ -1,7 +1,9 @@
 // Combat: Mara's fists (F key) and what a speeding car does to a pedestrian.
 // Light by design — one punch, one knockdown — but the law notices: every
-// pedestrian put on the ground adds heat to the wanted level.
+// pedestrian put on the ground adds heat to the wanted level. Phase 3 adds
+// the pistol: applyShotHit turns a shot's result into damage and heat.
 import { setPunch } from './player.js';
+import { damageCar } from './vehicles.js';
 
 const PUNCH_RANGE = 2.4;
 const PUNCH_COOLDOWN = 0.45;
@@ -56,8 +58,30 @@ export function createCombat() {
     return hit;
   }
 
+  /**
+   * Apply a pistol shot's result: damage the thing hit and return the heat
+   * it earns. A pedestrian down is +1★, a traffic car shot is +1★, shooting
+   * a patrol car is +2★ — and three hits disable any car outright.
+   */
+  function applyShotHit(hit) {
+    if (!hit) return 0;
+    if (hit.kind === 'ped') return 1;
+    if (hit.kind === 'traffic') {
+      const disabled = damageCar(hit.car, 1);
+      if (disabled) hit.car.speed = 0;
+      return 1;
+    }
+    if (hit.kind === 'police') {
+      const disabled = damageCar(hit.car, 1);
+      if (disabled) hit.car.speed = 0;
+      return 2;
+    }
+    return 0;
+  }
+
   combat.update = update;
   combat.tryPunch = tryPunch;
   combat.carHits = carHits;
+  combat.applyShotHit = applyShotHit;
   return combat;
 }
