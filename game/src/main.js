@@ -339,7 +339,6 @@ function frame() {
     if (state.mode === 'playing') {
       // Screenshot poses hold the throttle so the drive shot stays in motion.
       if (isShot && shotName === 'drive') input.forward = true;
-      if (isShot && shotName === 'chase') input.forward = true;
       if (state.inCar && state.car) {
         updateCar(state.car, dt, input, city.colliders, CITY.bound);
       } else {

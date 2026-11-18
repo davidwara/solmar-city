@@ -82,21 +82,21 @@ export function stageShot(name, ctx) {
     missions.startMission(1); // Hot Delivery — the job that starts wanted
     car.pos.set(3.5, 0, -30);
     car.heading = 0;
-    car.speed = 16;
+    car.speed = 6; // rolling slowly: the patrol cars close in on her bumper
     car.driven = true;
     ctx.enterCar(car);
     police.setWanted(2, player.pos);
-    police.place(0, 0, -58, 0);
-    police.place(1, 7, -70, 0);
+    police.place(0, 0, -52, 0);
+    police.place(1, 7, -62, 0);
     traffic.place(0, 3.5, 30, 'ns', 1, 11);
     traffic.place(1, -3.5, -110, 'ns', -1, 10);
     peds.place(0, 12, -10);
     peds.place(1, -12, 10);
-    // Side-elevation of the avenue: Mara's car drives past left-to-right
-    // with both patrol cars trailing behind it in the same lane. A fixed
-    // camera is robust here because the car crosses the frame, not away
-    // from it, whatever the headless frame rate is.
-    ctx.setCamera(24, 6, -10, 0, 2, -30);
+    // Side-elevation of the avenue: Mara's car rolls past with both patrol
+    // cars closing in behind it in the same lane. A fixed camera is robust
+    // here because the car crosses the frame, not away from it, whatever
+    // the headless frame rate is.
+    ctx.setCamera(16, 7, -2, 0, 2, -32);
     ctx.setState('playing');
     return 'fixed';
   }
