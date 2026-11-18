@@ -106,18 +106,19 @@ export function stageShot(name, ctx) {
     // cruising car on the beachfront behind her.
     setTimeOfDay(ctx.scene, ctx.city, 0.75);
     missions.startMission(0);
-    player.pos.set(-138, 0, 206);
-    player.heading = Math.PI * 0.92;
+    // Mara close to the camera, facing the pier and the gold beacon.
+    player.pos.set(-142, 0, 212);
+    player.heading = -0.55;
     ctx.exitCar(true);
     const near = cars[4];
-    near.pos.set(-124, 0, 186);
+    near.pos.set(-168, 0, 186);
     near.heading = Math.PI / 2;
-    near.group.position.set(-124, 0, 186);
+    near.group.position.set(-168, 0, 186);
     near.group.rotation.y = Math.PI / 2;
     traffic.place(0, -62, 186, 'ew', 1, 10);
-    peds.place(0, -132, 198);
+    peds.place(0, -156, 200);
     peds.place(1, -146, 214);
-    ctx.setCamera(-118, 5.5, 188, -148, 3, 222);
+    ctx.setCamera(-126, 4.5, 194, -148, 3, 222);
     ctx.setState('playing');
     return 'fixed';
   }
