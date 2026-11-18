@@ -132,7 +132,12 @@ export function createPolice(scene, seed) {
       const wantHeading = Math.atan2(dx, dz);
       car.heading += clamp(angleDiff(car.heading, wantHeading), -1.9 * dt, 1.9 * dt);
       const topSpeed = 24 + police.wanted * 2.5;
-      const targetSpeed = dist > 90 ? topSpeed : topSpeed * 0.92;
+      // Close in fast from afar, but creep in when near: at full speed a
+      // pursuit car just orbits the player and can never pin her down
+      // (on foot) or ram her (in a car). Creeping keeps it on her bumper.
+      const targetSpeed = dist > 90 ? topSpeed : dist < 14
+        ? Math.max(3.5, topSpeed * (dist / 30))
+        : topSpeed * 0.92;
       unit.speed += (targetSpeed - unit.speed) * Math.min(1, dt * 1.4);
       car.speed = unit.speed;
       car.pos.x += Math.sin(car.heading) * unit.speed * dt;
