@@ -7,6 +7,9 @@
 // Phase 3: the pistol, the night cycle, traffic lights and ped barks;
 // Phase 4: the mission shot runs the Smuggler's Run in the rain, and the
 // night shot runs a storm with lightning).
+// Phase 5: the mission shot is now the Island Hopper — Mara sailing the
+// bay toward the second island and its lighthouse — and the night shot
+// lights the lighthouse beam over the storm.
 // Poses set the hour through the day/night system, so the HUD clock always
 // agrees with the sky in the frame.
 
@@ -105,30 +108,23 @@ export function stageShot(name, ctx) {
     return 'fixed';
   }
   if (name === 'mission') {
-    // Job 7, the Smuggler's Run, in the rain: Mara driving up the avenue
-    // with the crate aboard, a striped roadblock ahead, a hidden package
-    // glowing on the sidewalk, rain falling and the HUD showing the
-    // wet-weather icon and the package counter.
-    ctx.daynight.setHours(16);
-    ctx.weather.setMode('rain');
-    missions.startMission(6);
-    // Stage the pickup as already done: crate aboard, roadblocks up.
-    missions.armSmugglerDelivery();
-    car.pos.set(62, 0, 80);
-    car.heading = 0;
-    car.speed = 10;
-    car.driven = true;
-    ctx.enterCar(car);
-    ctx.collectibles.stageOne(72, 100);
-    traffic.place(0, 58, 140, 'ns', 1, 9);
-    traffic.place(1, -62, 40, 'ns', -1, 10);
-    const scared = peds.place(0, 72, 110);
-    peds.bark(scared, 'Rain again!', 30); // long bubble so the shot catches it
-    peds.place(1, 52, 130);
-    peds.place(2, 72, 140);
-    // Over-the-shoulder from behind Mara's car: the roadblock at (62,124)
-    // sits right down the avenue in front of her.
-    ctx.setCamera(62, 6, 62, 62, 2, 124);
+    // Job 10, Island Hopper, at midday: Mara sailing the bay in the
+    // Marlin, the second island and its striped lighthouse rising ahead,
+    // the causeway bridge to the right, wake trailing behind the boat.
+    ctx.daynight.setHours(10);
+    missions.startMission(9);
+    const boat = ctx.boats.boats[1];
+    boat.pos.set(-40, 0, 296);
+    boat.heading = 0.25;
+    boat.speed = 13;
+    boat.driven = true;
+    ctx.enterBoat(boat);
+    peds.place(0, 24, 326);
+    peds.place(1, 56, 340);
+    peds.place(2, -20, 352);
+    traffic.place(0, 3.5, 30, 'ns', 1, 11);
+    // High over-the-shoulder from behind the boat: bay, island, lighthouse.
+    ctx.setCamera(-52, 16, 252, 30, 8, 380);
     ctx.setState('playing');
     return 'fixed';
   }
@@ -140,6 +136,7 @@ export function stageShot(name, ctx) {
     ctx.daynight.setHours(22);
     ctx.weather.setMode('storm');
     ctx.weather.flashNow();
+    ctx.island.lightOn(); // the lighthouse beam sweeps the stormy bay
     missions.startMission(3); // Night Run — the job that starts after dark
     car.pos.set(0, 0, 186);
     car.heading = Math.PI;

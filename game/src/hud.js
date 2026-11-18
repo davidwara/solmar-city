@@ -27,11 +27,12 @@ export function createHud() {
     packages: document.getElementById('packages'),
     station: document.getElementById('station'),
     flash: document.getElementById('flash'),
+    turf: document.getElementById('turf'),
   };
   const ctx = els.minimap.getContext('2d');
   const S = els.minimap.width; // 190
   const WORLD_MIN = -240;
-  const WORLD_MAX = 280;
+  const WORLD_MAX = 440; // Phase 5: the minimap now reaches the second island across the bay
   const scale = S / (WORLD_MAX - WORLD_MIN);
   function toMap(x, z) {
     return [(x - WORLD_MIN) * scale, (z - WORLD_MIN) * scale];
@@ -50,6 +51,52 @@ export function createHud() {
     const [, sandY] = toMap(0, 210);
     ctx.fillStyle = '#d9c184';
     ctx.fillRect(0, sandY, S, seaY - sandY);
+    // Phase 5: the second island across the bay (sand + grass block).
+    if (extra.island) {
+      const [ix1, iz1] = toMap(extra.island.minX, extra.island.minZ);
+      const [ix2, iz2] = toMap(extra.island.maxX, extra.island.maxZ);
+      ctx.fillStyle = '#d9c184';
+      ctx.fillRect(ix1, iz1, ix2 - ix1, iz2 - iz1);
+      ctx.fillStyle = '#6fae62';
+      ctx.fillRect(ix1 + 3, iz1 + 3, ix2 - ix1 - 6, iz2 - iz1 - 6);
+      // Lighthouse dot on the island's south tip.
+      if (extra.lighthousePos) {
+        const [lx, ly] = toMap(extra.lighthousePos.x, extra.lighthousePos.z);
+        ctx.fillStyle = extra.lighthouseLit ? '#fff6c8' : '#ff5a5a';
+        ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    // Phase 5: gang turf zones — coloured rings, gold when Mara owns them.
+    for (const zone of extra.turfZones || []) {
+      const [zx, zy] = toMap(zone.center.x, zone.center.z);
+      const zr = zone.radius * scale;
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = zone.css;
+      ctx.beginPath(); ctx.arc(zx, zy, zr, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = zone.owner === 'mara' ? '#ffd23f' : zone.css;
+      ctx.lineWidth = zone.owner === 'mara' ? 3 : 1.5;
+      ctx.beginPath(); ctx.arc(zx, zy, zr, 0, Math.PI * 2); ctx.stroke();
+      // Claim progress: a filling arc while Mara stands in the zone.
+      if (zone.claimProgress > 0 && zone.claimProgress < 1) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(zx, zy, zr - 3, -Math.PI / 2, -Math.PI / 2 + zone.claimProgress * Math.PI * 2); ctx.stroke();
+      }
+    }
+    // Phase 5: boats (white diamonds on the water) and the garage (orange square).
+    for (const boat of extra.boats || []) {
+      const [bx, by] = toMap(boat.pos.x, boat.pos.z);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(bx, by - 4); ctx.lineTo(bx + 3, by); ctx.lineTo(bx, by + 4); ctx.lineTo(bx - 3, by);
+      ctx.closePath(); ctx.fill();
+    }
+    if (extra.garagePos) {
+      const [gx, gy] = toMap(extra.garagePos.x, extra.garagePos.z);
+      ctx.fillStyle = '#ff7a2a';
+      ctx.fillRect(gx - 3.5, gy - 3.5, 7, 7);
+    }
     // Roads.
     ctx.strokeStyle = '#5a636e';
     ctx.lineWidth = 5;
@@ -171,13 +218,19 @@ export function createHud() {
     if (els.weather) els.weather.textContent = state.weatherIcon || '';
     if (els.packages) els.packages.textContent = state.packagesText || '';
     if (els.station) els.station.textContent = state.inCar ? (state.stationText || '') : '';
+    // Phase 5 readouts: turf owned, and boat speed on the water.
+    if (els.turf) els.turf.textContent = state.turfText || '';
     els.objective.textContent = state.objective;
     els.speed.textContent = state.inCar
       ? Math.round(Math.abs(state.speed) * 3.6) + ' km/h'
-      : '';
+      : state.inBoat
+        ? Math.round(state.boatSpeed || 0) + ' km/h · BOAT'
+        : '';
     els.hint.textContent = state.inCar
       ? 'WASD drive · E exit car · F punch · M mute · J jobs · P pause'
-      : (state.nearCar ? 'E — take the car · F punch · Click shoot · R reload · M mute · J jobs' : state.nearShop ? 'G — buy pistol $400 · WASD move · Shift run · Space jump · F punch · M mute · J jobs · P pause' : 'WASD move · Shift run · Space jump · E enter car · F punch · Click shoot · M mute · J jobs · P pause');
+      : state.inBoat
+        ? 'WASD sail · E step ashore · M mute · J jobs · P pause'
+        : (state.nearBoat ? 'E — board the boat · F punch · Click shoot · R reload · M mute · J jobs' : state.nearGarage ? 'G — Solmar Garage: paint, engine & armour · WASD move · Shift run · Space jump · F punch · M mute · J jobs · P pause' : state.nearCar ? 'E — take the car · F punch · Click shoot · R reload · M mute · J jobs' : state.nearShop ? 'G — buy pistol $400 · WASD move · Shift run · Space jump · F punch · M mute · J jobs · P pause' : 'WASD move · Shift run · Space jump · E enter car · F punch · Click shoot · M mute · J jobs · P pause');
     drawMinimap(state.playerPos, state.heading, state.cars, state.inCar, state.objectivePos, {
       traffic: state.traffic || [],
       police: state.police || [],
@@ -185,6 +238,12 @@ export function createHud() {
       shopPos: state.shopPos || null,
       vipPos: state.vipPos || null,
       packages: state.packageDots || [],
+      island: state.island || null,
+      lighthousePos: state.lighthousePos || null,
+      lighthouseLit: state.lighthouseLit || false,
+      turfZones: state.turfZones || [],
+      boats: state.boats || [],
+      garagePos: state.garagePos || null,
     });
   }
 

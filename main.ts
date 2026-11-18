@@ -12,6 +12,11 @@
 // Phase 4: two more source modules (weather.js, collectibles.js), three
 // more jobs (smuggler's run, getaway driver, shutterbug), a car radio in
 // audio.js, and rain/storm screenshot poses — same build, same dossier.
+// Phase 5: five more source modules (boats.js, island.js, gangs.js,
+// customization.js, story.js), three more jobs (island hopper, lighthouse
+// keeper, turf war), a second island with a lighthouse across the bay,
+// gang turf with passive income, a garage shop, and story cutscenes —
+// the mission screenshot now sails the bay to the island.
 //
 // The game is plain static files under this directory's game/ folder: a
 // three.js open-world crime game (game/index.html plus its ES modules, no

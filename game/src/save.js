@@ -22,6 +22,11 @@ export function loadSave() {
       // Phase 4: hidden packages found and Shutterbug photos snapped.
       packagesCollected: typeof data.packagesCollected === 'number' ? data.packagesCollected : 0,
       photosTaken: typeof data.photosTaken === 'number' ? data.photosTaken : 0,
+      // Phase 5: gang turf owned, garage paint/engine/armour.
+      turfOwned: Array.isArray(data.turfOwned) ? data.turfOwned : [],
+      paintIndex: typeof data.paintIndex === 'number' ? data.paintIndex : -1,
+      engineLevel: typeof data.engineLevel === 'number' ? data.engineLevel : 0,
+      armor: data.armor === true,
     };
   } catch {
     return null;
@@ -42,6 +47,10 @@ export function saveGame(data) {
       shotsFired: data.shotsFired || 0,
       packagesCollected: data.packagesCollected || 0,
       photosTaken: data.photosTaken || 0,
+      turfOwned: Array.isArray(data.turfOwned) ? data.turfOwned : [],
+      paintIndex: typeof data.paintIndex === 'number' ? data.paintIndex : -1,
+      engineLevel: typeof data.engineLevel === 'number' ? data.engineLevel : 0,
+      armor: data.armor === true,
     }));
     return true;
   } catch {

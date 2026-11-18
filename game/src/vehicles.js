@@ -93,7 +93,7 @@ export function updateCar(car, dt, input, colliders, bound, grip = 1) {
   // Drag + rolling resistance.
   car.speed -= car.speed * 0.55 * dt;
   if (!input.forward && !input.back) car.speed -= car.speed * 1.1 * dt;
-  car.speed = clamp(car.speed, -9, 30);
+  car.speed = clamp(car.speed, -9, 30 + (car.engineLevel || 0) * 6); // garage engine upgrades raise the top speed
   if (Math.abs(car.speed) < 0.05 && !input.forward && !input.back) car.speed = 0;
   // Steering scales with speed and flips in reverse.
   const steerTarget = (input.left ? 1 : 0) - (input.right ? 1 : 0);

@@ -10,6 +10,9 @@
 // game/src/, so this server still does nothing but serve static files.
 // Phase 4 note: same again — weather, collectibles, the radio and the
 // three new jobs are plain static ES modules; no new MIME type needed.
+// Phase 5 note: same again — boats, the island, gangs, the garage and
+// the story cutscenes are plain static ES modules too; the server still
+// does nothing but serve files, and the new systems need no new MIME type.
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';

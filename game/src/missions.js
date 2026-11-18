@@ -1,14 +1,18 @@
-// Missions: Mara's nine story jobs for the Solmar underworld.
+// Missions: Mara's twelve story jobs for the Solmar underworld.
 // Jobs 1-3 are drive-to-the-marker runs. Job 4 is a timed night run with
 // the law already on her, job 5 is a bodyguard walk (keep the client close
 // and alive), job 6 is a taxi shift: three fares against the clock.
 // Phase 4 adds three more: job 7 is a two-stage smuggler's run (pick up
 // at the marina, then deliver downtown past police roadblocks), job 8 is
 // a getaway (survive three stars for 100 seconds), job 9 is a shutterbug
-// tour (photograph three scenic spots with the C key). Finishing all
-// nine opens free roam with the whole city as Mara's playground. The
-// marker is a floating golden beacon + a light pillar, and the same
-// position feeds the HUD objective line and the minimap diamond.
+// tour (photograph three scenic spots with the C key).
+// Phase 5 adds the last three: job 10 is a boat delivery across the bay
+// to the second island, job 11 is a night run to light the lighthouse,
+// job 12 is a turf war — clear the Sharks out of their own turf.
+// Finishing all twelve opens free roam with the whole city as Mara's
+// playground. The marker is a floating golden beacon + a light pillar,
+// and the same position feeds the HUD objective line and the minimap
+// diamond.
 import * as THREE from 'three';
 import { CITY } from './city.js';
 import { clamp } from './utils.js';
@@ -123,6 +127,38 @@ export const MISSIONS = [
     reward: 500,
     timeLimit: 0,
   },
+  {
+    id: 'island-hopper',
+    title: 'Island Hopper',
+    kind: 'boat',
+    briefing: 'Take a boat from the marina and run the drop across the bay to the island jetty — the delivery only counts if you arrive by boat.',
+    target: new THREE.Vector3(40, 0, 312),
+    radius: 12,
+    reward: 1400,
+    timeLimit: 240,
+  },
+  {
+    id: 'lighthouse-keeper',
+    title: 'Lighthouse Keeper',
+    kind: 'lighthouse',
+    briefing: 'After dark, climb to the island lighthouse and light it — the beam guides the smugglers home. Reach the tower after 21:00.',
+    target: new THREE.Vector3(120, 0, 398),
+    radius: 10,
+    reward: 1600,
+    timeLimit: 300,
+    night: true,
+  },
+  {
+    id: 'turf-war',
+    title: 'Turf War',
+    kind: 'turf',
+    briefing: 'The Sharks jumped one of ours. Clear every Shark out of their turf on the north streets — get in close and lay them out with your fists.',
+    target: new THREE.Vector3(-62, 0, -124),
+    radius: 34,
+    reward: 1800,
+    timeLimit: 0,
+    gang: 'sharks',
+  },
 ];
 
 /** Create the mission system. Returns the tracker + marker + update. */
@@ -189,6 +225,12 @@ export function createMissions(scene) {
   function hideRoadblocks() {
     for (const b of roadblocks) b.visible = false;
   }
+
+  // Phase 5 hooks: the lighthouse job lights the island through a
+  // callback (the island module owns the beam), and the turf job counts
+  // rivals through the gangs module. Both are set by main.js.
+  let lighthouseHook = null;
+  let turfHook = null;
 
   const missions = {
     index: 0, // current job (0..8); 9 = all done
@@ -308,7 +350,7 @@ export function createMissions(scene) {
   function objectiveText(playerPos) {
     const m = current();
     if (!m) return 'All jobs done — Solmar City is yours. Free roam!';
-    const tag = `JOB ${missions.index + 1}/9 — ${m.title}: `;
+    const tag = `JOB ${missions.index + 1}/12 — ${m.title}: `;
     if (m.kind === 'bodyguard') {
       const d = Math.round(Math.hypot(m.target.x - missions.vipPos.x, m.target.z - missions.vipPos.z));
       const near = Math.hypot(missions.vipPos.x - playerPos.x, missions.vipPos.z - playerPos.z) < 18;
@@ -330,6 +372,20 @@ export function createMissions(scene) {
     }
     if (m.kind === 'getaway') {
       return tag + `Stay free — ${Math.max(0, Math.ceil(missions.timeLeft))}s until the heat dies. Lose the patrol cars!`;
+    }
+    if (m.kind === 'boat') {
+      const d = Math.round(Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z));
+      const time = m.timeLimit > 0 ? ` — ${Math.max(0, Math.ceil(missions.timeLeft))}s left` : '';
+      return tag + `Boat delivery — sail to the island jetty (${d}m), arrive by boat${time}`;
+    }
+    if (m.kind === 'lighthouse') {
+      const d = Math.round(Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z));
+      const time = m.timeLimit > 0 ? ` — ${Math.max(0, Math.ceil(missions.timeLeft))}s left` : '';
+      return tag + `Light the lighthouse on the island (${d}m)${time}`;
+    }
+    if (m.kind === 'turf') {
+      const left = turfHook ? turfHook() : 0;
+      return tag + `Clear the Sharks out of their turf — ${left} rival${left === 1 ? '' : 's'} left standing`;
     }
     if (m.kind === 'shutterbug') {
       const spot = m.spots[Math.min(missions.photoIndex, m.spots.length - 1)];
@@ -391,7 +447,7 @@ export function createMissions(scene) {
    *   crate is lifted (roadblocks go up, heat follows).
    * `failed` fires when a timed job runs out — the job restarts, no cash lost.
    */
-  function update(dt, playerPos) {
+  function update(dt, playerPos, opts) {
     const events = { completed: null, reward: 0, failed: false, heat: 0, fareDone: false, fareReward: 0, pickup: false, photoDone: false, photoReward: 0 };
     const m = current();
     if (!m) return events;
@@ -399,6 +455,47 @@ export function createMissions(scene) {
     missions.timer += dt;
     gem.position.y = 6 + Math.sin(missions.timer * 2.2) * 0.7;
     gem.rotation.y += dt * 1.5;
+
+    // --- Island Hopper: sail the drop to the island jetty, by boat. ------
+    if (m.kind === 'boat') {
+      if (m.timeLimit > 0) {
+        missions.timeLeft -= dt;
+        if (missions.timeLeft <= 0) {
+          missions.timeLeft = m.timeLimit;
+          events.failed = true;
+          return events;
+        }
+      }
+      const d = Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z);
+      const byBoat = Boolean(opts && opts.inBoat);
+      if (d < m.radius && byBoat) return completeJob(events);
+      return events;
+    }
+
+    // --- Lighthouse Keeper: reach the tower at night and light it. -------
+    if (m.kind === 'lighthouse') {
+      if (m.timeLimit > 0) {
+        missions.timeLeft -= dt;
+        if (missions.timeLeft <= 0) {
+          missions.timeLeft = m.timeLimit;
+          events.failed = true;
+          return events;
+        }
+      }
+      const d = Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z);
+      if (d < m.radius) {
+        if (lighthouseHook) lighthouseHook();
+        return completeJob(events);
+      }
+      return events;
+    }
+
+    // --- Turf War: the job ends when no Shark stands in their turf. ------
+    if (m.kind === 'turf') {
+      const left = turfHook ? turfHook() : 0;
+      if (left <= 0) return completeJob(events);
+      return events;
+    }
 
     // --- Smuggler's Run: fetch the crate, then deliver past roadblocks. --
     if (m.kind === 'smuggler') {
@@ -536,6 +633,8 @@ export function createMissions(scene) {
   missions.update = update;
   missions.snapPhoto = snapPhoto;
   missions.armSmugglerDelivery = armSmugglerDelivery;
+  missions.setLighthouseHook = (fn) => { lighthouseHook = fn; };
+  missions.setTurfHook = (fn) => { turfHook = fn; };
   placeMarker();
   return missions;
 }

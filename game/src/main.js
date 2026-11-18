@@ -10,6 +10,10 @@
 // Phase 4: dynamic weather (rain/storms, wet-road grip, lightning),
 // three more jobs (smuggler's run, getaway driver, shutterbug), 15 hidden
 // packages to hunt, and two procedural radio stations while driving.
+// Phase 5: drivable boats on the bay, a second island with a lighthouse
+// across a causeway, three more jobs (boat delivery, lighthouse keeper,
+// turf war), gang turf with passive income, a garage for paint/engine/
+// armour, and story cutscenes before jobs 1, 4, 7 and 10.
 import * as THREE from 'three';
 import { buildCity, CITY } from './city.js';
 import { createPlayer, updatePlayer } from './player.js';
@@ -28,6 +32,11 @@ import { createDayNight } from './daynight.js';
 import { createWasted, HOSPITAL_POS } from './wasted.js';
 import { createWeather } from './weather.js';
 import { createCollectibles } from './collectibles.js';
+import { createBoats } from './boats.js';
+import { buildIsland, ISLAND_BOUNDS, ISLAND_DOCK, LIGHTHOUSE_POS } from './island.js';
+import { createGangs } from './gangs.js';
+import { createCustomization, ARMOR_BONUS } from './customization.js';
+import { createStory, STORY_JOBS } from './story.js';
 
 const params = new URLSearchParams(window.location.search);
 const shotName = params.get('shot');
@@ -57,12 +66,38 @@ const daynight = createDayNight(scene, city);
 const wasted = createWasted();
 const weather = createWeather(scene, city, daynight);
 const collectibles = createCollectibles(scene, seed);
+const island = buildIsland(scene, seed);
+const boats = createBoats(scene);
+const gangs = createGangs(scene, seed);
+const story = createStory();
+const customization = createCustomization(scene, {
+  getMoney: () => state.money,
+  spend: (amount) => {
+    if (state.money < amount) return false;
+    state.money -= amount;
+    persistSave();
+    return true;
+  },
+  onBought: (text) => {
+    toast(text);
+    audio.chime();
+    if (customization.state.armor) state.maxHealth = 100 + ARMOR_BONUS;
+  },
+  onClosed: () => { state.mode = 'playing'; },
+});
+// The island's buildings block movement just like the mainland's.
+for (const c of island.colliders) city.colliders.push(c);
+// Mission hooks: the lighthouse job lights the island's beam, and the
+// turf job counts the Sharks still standing in their turf.
+missions.setLighthouseHook(() => island.lightOn());
+missions.setTurfHook(() => gangs.rivalsAliveIn('sharks'));
 
 // --- game state ------------------------------------------------------------
 const savedGame = loadSave();
 const state = {
-  mode: 'menu', // menu | playing | paused
+  mode: 'menu', // menu | playing | paused | story | garage
   health: 100,
+  maxHealth: 100,
   money: 1250,
   wanted: 0,
   bestWanted: 0,
@@ -71,6 +106,10 @@ const state = {
   inCar: false,
   car: null,
   nearCar: null,
+  inBoat: false,
+  boat: null,
+  nearBoat: null,
+  nearGarage: false,
   cameraYaw: Math.PI,
   cameraPitch: 0.32,
   cameraDist: 9,
@@ -103,7 +142,24 @@ function persistSave() {
     shotsFired: weapons.shotsFired,
     packagesCollected: collectibles.count,
     photosTaken: missions.photosTaken,
+    turfOwned: gangs.saveData(),
+    paintIndex: customization.state.paintIndex,
+    engineLevel: customization.state.engineLevel,
+    armor: customization.state.armor,
   });
+}
+
+/** Play the story cutscene for a job, if it has one; otherwise just play. */
+function maybeShowStory(jobIndex, after) {
+  if (isShot) { if (after) after(); return; }
+  if (STORY_JOBS.includes(jobIndex) && story.showFor(jobIndex, () => {
+    state.mode = 'playing';
+    if (after) after();
+  })) {
+    state.mode = 'story';
+  } else if (after) {
+    after();
+  }
 }
 
 function toast(text) {
@@ -126,18 +182,23 @@ function startGame(useSave) {
     wasted.timesBusted = savedGame.timesBusted || 0;
     weapons.shotsFired = savedGame.shotsFired || 0;
     collectibles.restore(savedGame.packagesCollected || 0);
-    missions.startMission(Math.min(savedGame.missionsCompleted, 8));
+    customization.restore(savedGame);
+    gangs.restore(savedGame.turfOwned);
+    if (customization.state.armor) state.maxHealth = 100 + ARMOR_BONUS;
+    missions.startMission(Math.min(savedGame.missionsCompleted, 11));
     maybeStartNight();
-    toast(`Welcome back, Mara — ${savedGame.missionsCompleted}/9 jobs done.`);
+    toast(`Welcome back, Mara — ${savedGame.missionsCompleted}/12 jobs done.`);
   } else {
     state.money = 1250;
     state.health = 100;
+    state.maxHealth = 100;
     state.bestWanted = 0;
     missions.startMission(0);
     if (!isShot) clearSave();
   }
   state.mode = 'playing';
   showScreen(null);
+  maybeShowStory(missions.index);
 }
 
 function handleBusted() {
@@ -145,6 +206,7 @@ function handleBusted() {
   police.setWanted(0, player.pos);
   state.money = Math.max(0, state.money - 150);
   if (state.car) exitCar(true);
+  if (state.boat) exitBoat(true);
   player.pos.set(0, 0, -20);
   player.group.position.copy(player.pos);
   state.health = Math.max(state.health, 60);
@@ -159,12 +221,13 @@ function handleWasted() {
   state.money = Math.max(0, state.money - bill);
   police.setWanted(0, player.pos);
   if (state.car) exitCar(true);
+  if (state.boat) exitBoat(true);
   state.mode = 'wasted';
   audio.thud();
   wasted.showWasted(() => {
     player.pos.set(HOSPITAL_POS.x, 0, HOSPITAL_POS.z);
     player.group.position.copy(player.pos);
-    state.health = 100;
+    state.health = state.maxHealth;
     state.mode = 'playing';
     toast(`WASTED! St. Solmar patched you up — $${bill}.`);
     persistSave();
@@ -199,11 +262,29 @@ function fireShot() {
 
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') e.preventDefault();
+  // Story cutscene: any key advances the dialogue, nothing else runs.
+  if (state.mode === 'story') {
+    if (!e.repeat) story.advance();
+    return;
+  }
+  // Garage shop open: G or Escape closes it, other keys wait.
+  if (state.mode === 'garage') {
+    if (!e.repeat && (e.code === 'Escape' || e.code === 'KeyG')) customization.close();
+    return;
+  }
   if (KEYMAP[e.code]) input[KEYMAP[e.code]] = true;
   if (e.code === 'KeyE' && !e.repeat && state.mode === 'playing') toggleCar();
   if ((e.code === 'KeyP' || e.code === 'Escape') && !e.repeat) togglePause();
   if (e.code === 'Enter' && state.mode === 'menu') startGame(false);
-  if (e.code === 'KeyF' && !e.repeat && state.mode === 'playing' && !state.inCar) {
+  if (e.code === 'KeyF' && !e.repeat && state.mode === 'playing' && !state.inCar && !state.inBoat) {
+    // A rival gang member up close goes down first — turf war business.
+    const rival = gangs.nearestRival(player.pos, 2.4);
+    if (rival) {
+      gangs.knockDown(rival);
+      audio.thud();
+      toast('Rival down! The turf notices.');
+      return;
+    }
     const hit = combat.tryPunch(player, peds);
     if (hit) {
       police.addHeat(1, player.pos);
@@ -232,7 +313,14 @@ window.addEventListener('keydown', (e) => {
       toast('Job restarted — back to the marker.');
     }
   }
-  if (e.code === 'KeyG' && !e.repeat && state.mode === 'playing' && !state.inCar) {
+  if (e.code === 'KeyG' && !e.repeat && state.mode === 'playing' && !state.inCar && !state.inBoat) {
+    // The garage comes first when Mara stands on its lot; otherwise the
+    // gun shop — same key, whichever business she is standing in.
+    if (customization.nearGarage(player.pos)) {
+      state.mode = 'garage';
+      customization.open();
+      return;
+    }
     if (!weapons.nearShop(player.pos)) {
       toast('Gun shop is on the downtown corner — look for the green sign.');
       return;
@@ -297,6 +385,7 @@ renderer.domElement.addEventListener('mousedown', (e) => {
   dragging = true;
   lastX = e.clientX;
   lastY = e.clientY;
+  if (state.mode === 'story') { story.advance(); return; }
   if (state.mode === 'playing' && !state.inCar && weapons.owned) fireShot();
 });
 window.addEventListener('mouseup', () => { dragging = false; });
@@ -329,12 +418,42 @@ function togglePause() {
 }
 
 function toggleCar() {
+  if (state.inBoat) {
+    exitBoat(false);
+    return;
+  }
   if (state.inCar) {
     exitCar(false);
     return;
   }
+  const boat = boats.nearest(player.pos, 6);
+  if (boat) { enterBoat(boat); return; }
   const car = nearestCar(cars, player.pos, 4.5);
   if (car) enterCar(car);
+}
+
+/** Board a boat: Mara stands on deck, the boat answers the throttle. */
+function enterBoat(boat) {
+  state.inBoat = true;
+  state.boat = boat;
+  boat.driven = true;
+  player.group.visible = false;
+  toast(`${boat.name} — W throttle, A/D rudder, E to step ashore.`);
+}
+
+/** Step ashore from a boat, onto the nearest dry land. */
+function exitBoat(silent) {
+  if (!state.boat) return;
+  const boat = state.boat;
+  boat.driven = false;
+  boat.speed = 0;
+  const shore = boats.shorePoint(boat.pos);
+  player.pos.copy(shore);
+  player.group.position.copy(player.pos);
+  player.group.visible = true;
+  state.inBoat = false;
+  state.boat = null;
+  if (!silent) state.cameraYaw = boat.heading + Math.PI;
 }
 
 function enterCar(car) {
@@ -347,6 +466,7 @@ function enterCar(car) {
   state.inCar = true;
   state.car = car;
   car.driven = true;
+  customization.applyTo(car);
   player.group.visible = false;
 }
 
@@ -371,11 +491,12 @@ function updateCamera(dt) {
     camera.lookAt(state.fixedCam.look);
     return;
   }
-  const focus = state.inCar ? state.car.pos : player.pos;
-  const focusY = state.inCar ? 1.6 : 1.7;
-  // Ease the orbit yaw toward the car's heading while driving.
-  if (state.inCar) {
-    const behind = state.car.heading + Math.PI;
+  const focus = state.inBoat ? state.boat.pos : state.inCar ? state.car.pos : player.pos;
+  const focusY = state.inCar || state.inBoat ? 1.6 : 1.7;
+  // Ease the orbit yaw toward the car's (or boat's) heading while driving.
+  if (state.inCar || state.inBoat) {
+    const heading = state.inCar ? state.car.heading : state.boat.heading;
+    const behind = heading + Math.PI;
     let d = behind - state.cameraYaw;
     while (d > Math.PI) d -= Math.PI * 2;
     while (d < -Math.PI) d += Math.PI * 2;
@@ -415,10 +536,17 @@ if (isShot) {
     },
     enterCar,
     exitCar,
+    enterBoat,
+    exitBoat,
     daynight,
     weapons,
     weather,
     collectibles,
+    boats,
+    island,
+    gangs,
+    customization,
+    story,
   });
   if (shotName === 'menu') {
     // Menu pose keeps the start screen visible over a sunset vista.
@@ -456,7 +584,8 @@ document.getElementById('restart-button').addEventListener('click', () => {
   player.pos.set(0, 0, -20);
   player.group.position.copy(player.pos);
   if (state.car) exitCar(true);
-  state.health = 100;
+  if (state.boat) exitBoat(true);
+  state.health = state.maxHealth;
   police.setWanted(0, player.pos);
   missions.restartCurrent();
   maybeStartNight();
@@ -465,7 +594,7 @@ document.getElementById('restart-button').addEventListener('click', () => {
 });
 
 // Debug handle for headless probes (CDP): window.__solmar.
-window.__solmar = { state, missions, police, traffic, peds, player, cars, weapons, daynight, wasted, weather, collectibles };
+window.__solmar = { state, missions, police, traffic, peds, player, cars, weapons, daynight, wasted, weather, collectibles, boats, island, gangs, customization, story };
 
 // --- main loop ---------------------------------------------------------------
 const clock = new THREE.Clock();
@@ -480,17 +609,44 @@ function frame() {
       // stage sets the hour directly) and the pistol animates its tracer.
       if (!isShot) daynight.update(dt);
       weapons.update(dt);
-      player.aiming = weapons.owned && !state.inCar;
-      if (state.inCar && state.car) {
+      story.update(dt);
+      player.aiming = weapons.owned && !state.inCar && !state.inBoat;
+      if (state.inBoat && state.boat) {
+        boats.update(dt, input, state.boat, clock.elapsedTime);
+      } else if (state.inCar && state.car) {
+        boats.update(dt, input, null, clock.elapsedTime);
         updateCar(state.car, dt, input, city.colliders, CITY.bound, weather.gripFactor());
       } else {
+        boats.update(dt, input, null, clock.elapsedTime);
         updatePlayer(player, dt, input, state.cameraYaw, city.colliders, CITY.bound);
       }
-      state.nearCar = state.inCar ? null : nearestCar(cars, player.pos, 4.5);
+      island.update(dt, daynight.isNight);
+      state.nearCar = state.inCar || state.inBoat ? null : nearestCar(cars, player.pos, 4.5);
+      state.nearBoat = state.inCar || state.inBoat ? null : boats.nearest(player.pos, 6);
+      state.nearGarage = !state.inCar && !state.inBoat && customization.nearGarage(player.pos);
       state.nearShop = !state.inCar && weapons.nearShop(player.pos);
 
+      // --- gangs: turf claims, passive income, rival fists ---------------
+      const focusPos = state.inBoat ? state.boat.pos : state.inCar ? state.car.pos : player.pos;
+      const gangEvents = gangs.update(dt, focusPos, state.inCar, state.inBoat);
+      if (gangEvents.claimed) {
+        audio.jingle();
+        toast(`TURF TAKEN — the ${gangEvents.claimedName} turf is Mara's now. +$50/min.`);
+        persistSave();
+      }
+      if (gangEvents.income > 0) {
+        state.money += gangEvents.income;
+        toast(`Turf income — +$${gangEvents.income} from Mara's turf.`);
+        persistSave();
+      }
+      if (gangEvents.damage > 0) {
+        state.health -= gangEvents.damage;
+        audio.thud();
+        toast('Rival gang member landed a hit!');
+      }
+      if (missions.current() && missions.current().kind === 'turf') gangs.armTurfMission();
+
       // --- the living city -------------------------------------------------
-      const focusPos = state.inCar ? state.car.pos : player.pos;
       traffic.update(dt, {
         playerCar: state.car,
         playerPos: focusPos,
@@ -539,11 +695,11 @@ function frame() {
         audio.thud();
       }
       if (policeEvents.busted) handleBusted();
-      if (state.wanted === 0 && state.health > 0 && state.health < 100) state.health = Math.min(100, state.health + 2 * dt);
+      if (state.wanted === 0 && state.health > 0 && state.health < state.maxHealth) state.health = Math.min(state.maxHealth, state.health + 2 * dt);
       if (state.health <= 0) handleWasted();
 
       // --- missions ----------------------------------------------------------
-      const missionEvents = missions.update(dt, focusPos);
+      const missionEvents = missions.update(dt, focusPos, { inBoat: state.inBoat });
       if (missionEvents.fareDone) {
         state.money += missionEvents.fareReward;
         audio.chime();
@@ -570,6 +726,10 @@ function frame() {
         if (missions.current() && missions.current().night) {
           daynight.setHours(21);
           toast('Night falls — the Night Run starts after dark.');
+        }
+        // Jobs 4, 7 and 10 open with a cutscene; the next one plays now.
+        if (missions.current() && STORY_JOBS.includes(missions.index)) {
+          maybeShowStory(missions.index);
         }
         if (!missions.current()) toast('ALL JOBS DONE — Solmar City is yours!');
         persistSave();
@@ -624,11 +784,15 @@ function frame() {
     objective: state.objective,
     objectivePos: state.objectivePos,
     inCar: state.inCar,
+    inBoat: state.inBoat,
+    boatSpeed: state.boat ? boats.speedKmh(state.boat) : 0,
     speed: state.inCar ? state.car.speed : 0,
-    playerPos: state.inCar ? state.car.pos : player.pos,
-    heading: state.inCar ? state.car.heading : player.heading,
+    playerPos: state.inBoat ? state.boat.pos : state.inCar ? state.car.pos : player.pos,
+    heading: state.inBoat ? state.boat.heading : state.inCar ? state.car.heading : player.heading,
     cars,
     nearCar: state.nearCar,
+    nearBoat: state.nearBoat,
+    nearGarage: state.nearGarage,
     nearShop: state.nearShop,
     traffic: traffic.cars,
     police: police.cars,
@@ -642,6 +806,13 @@ function frame() {
     packagesText: collectibles.counterText(),
     stationText: audio.stationName(),
     packageDots: collectibles.nearby(state.inCar ? state.car.pos : player.pos),
+    turfText: `Turf ${gangs.ownedCount()}/3`,
+    island: ISLAND_BOUNDS,
+    lighthousePos: LIGHTHOUSE_POS,
+    lighthouseLit: island.isLit(),
+    turfZones: gangs.zones,
+    boats: boats.boats,
+    garagePos: customization.garagePos,
   });
   renderer.render(scene, camera);
   framesRendered++;
