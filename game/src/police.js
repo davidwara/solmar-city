@@ -1,28 +1,17 @@
-// The wanted system: stars, pursuit cars, ram runs and busts.
-// One patrol car per star chases Mara (or her car) until she gets far
-// enough away for long enough that the heat cools off one star at a
-// time. At three stars the patrol cars stop creeping and go for the
-// bumper instead.
+// police.js — the wanted system and its pursuit cars.
+//
+// Heat runs 0..3 stars, one patrol car per star. Units chase Mara (or her
+// car), creep in close, ram at three stars, and bust her on foot if they
+// hold her for 1.4s. Lose them for long enough and the heat cools off,
+// one star at a time.
 import * as THREE from 'three';
 import { createCar, addLightBar } from './vehicles.js';
 import { CITY, randomRoadPoint } from './city.js';
-import { createRng, clamp, angleDiff } from './utils.js';
+import { createRng, rand, clamp, angleDiff } from './utils.js';
 import { resolveCollisions } from './player.js';
 
 const MAX_WANTED = 3;
-const BUST_HOLD = 1.4; // seconds a patrol car must stay on foot-Mara to bust her
-const MIN_SPAWN_GAP = 35; // never spawn a pursuit car closer than this
-const SPAWN_PUSH_OUT = 45; // ...push it out to this distance instead
-const SPAWN_CLAMP = 200;
-const UNSEEN_TO_DECAY = 6; // seconds out of sight before a star starts fading
-const DECAY_TO_DROP = 4; // seconds of fading before one star drops
-const LOSE_RANGE = 110; // beyond this the patrol cars are losing her
-const RAM_RANGE = 4.2; // a ram connects inside this
-const RAM_DAMAGE_RANGE = 3.4; // ...and only hurts inside this
-const BUST_RANGE = 3.2;
-
-const PATROL_PAINT = 0x181c22;
-const DOOR_WHITE = 0xf2f2f2;
+const BUST_TIME = 1.4;
 
 export function createPolice(scene, seed) {
   const rng = createRng(seed * 15485863 + 99);
@@ -35,50 +24,68 @@ export function createPolice(scene, seed) {
     ramCooldown: 0,
     flash: 0,
     ramming: false,
+    addHeat,
+    setWanted,
+    place,
+    update,
   };
 
-  // One patrol unit: a near-black car, a light bar, and a white door
-  // slab so it reads as a patrol car at a glance.
+  /** Build one patrol car at a spot: near-black paint, light bar, white doors. */
   function buildUnit(x, z, heading) {
-    const car = createCar(scene, x, z, heading, PATROL_PAINT);
+    const car = createCar(scene, x, z, heading, 0x181c22);
     const lights = addLightBar(car.group);
-    const door = new THREE.Mesh(
+    const slab = new THREE.Mesh(
       new THREE.BoxGeometry(1.92, 0.3, 1.4),
-      new THREE.MeshLambertMaterial({ color: DOOR_WHITE }),
+      new THREE.MeshLambertMaterial({ color: 0xf2f2f2 })
     );
-    door.position.y = 0.62;
-    car.group.add(door);
+    slab.position.y = 0.62;
+    car.group.add(slab);
     return { car, lights, speed: 0, bustTimer: 0 };
   }
 
-  // Drop a fresh unit onto a road near the target, never on top of her.
-  function spawnNear(targetPos) {
+  /** Drop a unit on a random road point near the target (never too close). */
+  function dropNear(unit, targetPos) {
     const spot = randomRoadPoint(rng);
     let x = spot.x;
     let z = spot.z;
-    const dx = x - targetPos.x;
-    const dz = z - targetPos.z;
+    let dx = x - targetPos.x;
+    let dz = z - targetPos.z;
     const d = Math.hypot(dx, dz);
-    if (d < MIN_SPAWN_GAP) {
-      const bx = d > 0.001 ? dx / d : 1;
-      const bz = d > 0.001 ? dz / d : 0;
-      x = clamp(targetPos.x + bx * SPAWN_PUSH_OUT, -SPAWN_CLAMP, SPAWN_CLAMP);
-      z = clamp(targetPos.z + bz * SPAWN_PUSH_OUT, -SPAWN_CLAMP, SPAWN_CLAMP);
+    if (d < 35) {
+      const ux = d > 0.01 ? dx / d : 1;
+      const uz = d > 0.01 ? dz / d : 0;
+      x = clamp(targetPos.x + ux * 45, -200, 200);
+      z = clamp(targetPos.z + uz * 45, -200, 200);
     }
-    const heading = Math.atan2(targetPos.x - x, targetPos.z - z);
-    const unit = buildUnit(x, z, heading);
+    unit.car.pos.set(x, 0, z);
+    unit.car.heading = Math.atan2(targetPos.x - x, targetPos.z - z);
+    unit.car.group.position.copy(unit.car.pos);
+    unit.car.group.rotation.y = unit.car.heading;
+  }
+
+  function spawnUnit(targetPos) {
+    const unit = buildUnit(0, 0, 0);
+    dropNear(unit, targetPos);
     police.cars.push(unit);
     return unit;
   }
 
-  // Grow or shrink the fleet until there is exactly one car per star.
-  // Cars that leave the fleet are hidden, not destroyed.
-  function ensureFleet(count, targetPos) {
-    const anchor = targetPos || { x: 0, z: 0 };
-    while (police.cars.length < count) spawnNear(anchor);
-    while (police.cars.length > count) {
-      const extra = police.cars.pop();
-      extra.car.group.visible = false;
+  /** Keep exactly n units visible: reuse hidden ones, spawn, or hide extras. */
+  function ensureFleet(n, targetPos) {
+    let visible = police.cars.filter((u) => u.car.group.visible);
+    while (visible.length < n) {
+      const hidden = police.cars.find((u) => !u.car.group.visible);
+      if (hidden) {
+        hidden.car.group.visible = true;
+        dropNear(hidden, targetPos);
+      } else {
+        spawnUnit(targetPos);
+      }
+      visible = police.cars.filter((u) => u.car.group.visible);
+    }
+    while (visible.length > n) {
+      visible[visible.length - 1].car.group.visible = false;
+      visible = police.cars.filter((u) => u.car.group.visible);
     }
   }
 
@@ -95,12 +102,10 @@ export function createPolice(scene, seed) {
     ensureFleet(police.wanted, playerPos);
   }
 
-  // Stage one pursuit car at an exact spot (screenshot poses).
+  /** Stage a pursuit car at an exact spot (screenshot poses). */
   function place(i, x, z, heading) {
     while (police.cars.length <= i) {
-      const spare = buildUnit(x, z, heading);
-      spare.car.group.visible = false;
-      police.cars.push(spare);
+      police.cars.push(buildUnit(x, z, heading));
     }
     const unit = police.cars[i];
     unit.car.group.visible = true;
@@ -109,7 +114,7 @@ export function createPolice(scene, seed) {
     unit.speed = 14;
     unit.car.speed = 14;
     unit.car.group.position.copy(unit.car.pos);
-    unit.car.group.rotation.y = heading;
+    unit.car.group.rotation.y = unit.car.heading;
     return unit;
   }
 
@@ -118,109 +123,97 @@ export function createPolice(scene, seed) {
     police.flash += dt * 7;
     police.ramCooldown = Math.max(0, police.ramCooldown - dt);
 
-    // Alternate the light bars red/blue on the flash phase.
-    const redPhase = Math.floor(police.flash) % 2 === 0;
-    for (const unit of police.cars) {
-      unit.lights.red.material.color.setHex(redPhase ? 0xff2222 : 0x330000);
-      unit.lights.blue.material.color.setHex(redPhase ? 0x000033 : 0x2266ff);
+    // Light bars flash red/blue on alternating beats.
+    const redOn = Math.floor(police.flash) % 2 === 0;
+    for (const u of police.cars) {
+      if (!u.lights) continue;
+      u.lights.red.material.color.setHex(redOn ? 0xff2222 : 0x550000);
+      u.lights.blue.material.color.setHex(redOn ? 0x002266 : 0x2266ff);
     }
 
-    // No heat: no pursuit. Clear the fleet and go home.
-    if (police.wanted <= 0) {
+    if (police.wanted === 0) {
       police.ramming = false;
-      for (const unit of police.cars) unit.car.group.visible = false;
+      for (const u of police.cars) u.car.group.visible = false;
       police.cars.length = 0;
       return events;
     }
 
-    const targetPos = (inCar && playerCar) ? playerCar.pos : player.pos;
+    const targetPos = inCar && playerCar ? playerCar.pos : player.pos;
     ensureFleet(police.wanted, targetPos);
 
-    // Three stars in a car: the ram run. Faster, sharper, no creeping.
-    const ramRun = police.wanted >= MAX_WANTED && inCar;
+    // At three stars in a car the patrol stops creeping and goes for the hit.
+    const ramRun = police.wanted === 3 && inCar;
     police.ramming = ramRun;
     const topSpeed = 24 + 2.5 * police.wanted + (ramRun ? 6 : 0);
     const turnRate = ramRun ? 2.8 : 1.9;
 
-    for (const unit of police.cars) {
-      // Shot three times: the engine is dead, the car sits where it is.
-      if (typeof unit.car.hp === 'number' && unit.car.hp <= 0) {
-        unit.speed = 0;
-        unit.car.speed = 0;
+    let nearestDist = Infinity;
+    for (const u of police.cars) {
+      if (!u.car.group.visible) continue;
+      const gap = Math.hypot(u.car.pos.x - targetPos.x, u.car.pos.z - targetPos.z);
+      if (gap < nearestDist) nearestDist = gap;
+
+      // A car shot three times is dead on the road: it stops and stays put.
+      if (typeof u.car.hp === 'number' && u.car.hp <= 0) {
+        u.speed = 0;
+        u.car.speed = 0;
         continue;
       }
 
-      const dx = targetPos.x - unit.car.pos.x;
-      const dz = targetPos.z - unit.car.pos.z;
-      const dist = Math.hypot(dx, dz);
+      const wantHeading = Math.atan2(targetPos.x - u.car.pos.x, targetPos.z - u.car.pos.z);
+      u.car.heading += clamp(angleDiff(u.car.heading, wantHeading), -turnRate * dt, turnRate * dt);
 
-      // Steer toward the target, capped so the chase stays escapable.
-      const wantHeading = Math.atan2(dx, dz);
-      const turn = angleDiff(unit.car.heading, wantHeading);
-      unit.car.heading += clamp(turn, -turnRate * dt, turnRate * dt);
-
-      // Close in fast from afar, creep when near — unless ramming,
-      // in which case hold top speed all the way to the bumper.
+      // Close in fast from afar, creep when near — unless it's a ram run.
       let target;
       if (ramRun) target = topSpeed;
-      else if (dist > 90) target = topSpeed;
-      else if (dist < 14) target = Math.max(3.5, topSpeed * (dist / 30));
+      else if (gap > 90) target = topSpeed;
+      else if (gap < 14) target = Math.max(3.5, topSpeed * gap / 30);
       else target = topSpeed * 0.92;
-      unit.speed += (target - unit.speed) * Math.min(1, dt * 1.4);
-      unit.car.speed = unit.speed;
+      u.speed += (target - u.speed) * Math.min(1, dt * 1.4);
+      u.car.speed = u.speed;
 
-      unit.car.pos.x += Math.sin(unit.car.heading) * unit.speed * dt;
-      unit.car.pos.z += Math.cos(unit.car.heading) * unit.speed * dt;
-      unit.car.pos.x = clamp(unit.car.pos.x, -CITY.bound, CITY.bound);
-      unit.car.pos.z = clamp(unit.car.pos.z, -CITY.bound, CITY.bound + 40);
-      resolveCollisions(unit.car.pos, 2.0, colliders);
-      unit.car.group.position.copy(unit.car.pos);
-      unit.car.group.rotation.y = unit.car.heading;
-      for (const wheel of unit.car.wheels) wheel.rotation.x += unit.speed * dt * 2.2;
+      u.car.pos.x += Math.sin(u.car.heading) * u.speed * dt;
+      u.car.pos.z += Math.cos(u.car.heading) * u.speed * dt;
+      u.car.pos.x = clamp(u.car.pos.x, -CITY.bound, CITY.bound);
+      u.car.pos.z = clamp(u.car.pos.z, -CITY.bound, CITY.bound + 40);
+      resolveCollisions(u.car.pos, 2.0, colliders);
+      u.car.group.position.copy(u.car.pos);
+      u.car.group.rotation.y = u.car.heading;
+      for (const wheel of u.car.wheels) wheel.rotation.x += u.speed * dt * 2.2;
 
       if (inCar && playerCar) {
-        // Ram: a close pass shoves Mara's car and bleeds its speed; a
-        // hard hit (inside 3.4m) counts as one damaging ram per 0.8s.
-        const rdx = playerCar.pos.x - unit.car.pos.x;
-        const rdz = playerCar.pos.z - unit.car.pos.z;
-        const rd = Math.hypot(rdx, rdz);
-        if (rd < RAM_RANGE && police.ramCooldown <= 0) {
+        // Ram: shove and slow the player's car; at most one damaging
+        // ram per 0.8s.
+        const ramGap = Math.hypot(playerCar.pos.x - u.car.pos.x, playerCar.pos.z - u.car.pos.z);
+        if (ramGap < 4.2 && police.ramCooldown <= 0) {
           playerCar.speed *= ramRun ? 0.68 : 0.82;
           const shove = ramRun ? 0.14 : 0.06;
-          playerCar.pos.x += rdx * shove;
-          playerCar.pos.z += rdz * shove;
-          if (rd < RAM_DAMAGE_RANGE) {
+          playerCar.pos.x += (playerCar.pos.x - u.car.pos.x) * shove;
+          playerCar.pos.z += (playerCar.pos.z - u.car.pos.z) * shove;
+          if (ramGap < 3.4) {
             events.rammed = true;
             police.ramCooldown = 0.8;
           }
         }
-        unit.bustTimer = 0;
+        u.bustTimer = 0;
       } else {
-        // Bust: on foot, a patrol car that stays on Mara for 1.4s
-        // takes her in. Drift away and the timer resets.
-        const bdx = player.pos.x - unit.car.pos.x;
-        const bdz = player.pos.z - unit.car.pos.z;
-        if (Math.hypot(bdx, bdz) < BUST_RANGE) {
-          unit.bustTimer += dt;
-          if (unit.bustTimer > BUST_HOLD) events.busted = true;
+        // Bust: hold Mara for 1.4s on foot and it's over.
+        const footGap = Math.hypot(player.pos.x - u.car.pos.x, player.pos.z - u.car.pos.z);
+        if (footGap < 3.2) {
+          u.bustTimer += dt;
+          if (u.bustTimer > BUST_TIME) events.busted = true;
         } else {
-          unit.bustTimer = 0;
+          u.bustTimer = 0;
         }
       }
     }
 
-    // Cooling off: out of sight for 6s, then one star fades every 4s.
-    // Any patrol car within range resets both clocks.
-    let nearest = Infinity;
-    for (const unit of police.cars) {
-      const d = Math.hypot(unit.car.pos.x - targetPos.x, unit.car.pos.z - targetPos.z);
-      if (d < nearest) nearest = d;
-    }
-    if (nearest > LOSE_RANGE) {
+    // Cooling off: unseen for 6s, then one star drops every 4s.
+    if (nearestDist > 110) {
       police.unseenTimer += dt;
-      if (police.unseenTimer > UNSEEN_TO_DECAY) {
+      if (police.unseenTimer > 6) {
         police.decayTimer += dt;
-        if (police.decayTimer > DECAY_TO_DROP) {
+        if (police.decayTimer > 4) {
           police.wanted = Math.max(0, police.wanted - 1);
           police.decayTimer = 0;
         }
@@ -229,12 +222,9 @@ export function createPolice(scene, seed) {
       police.unseenTimer = 0;
       police.decayTimer = 0;
     }
+
     return events;
   }
 
-  police.addHeat = addHeat;
-  police.setWanted = setWanted;
-  police.place = place;
-  police.update = update;
   return police;
 }

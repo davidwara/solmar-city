@@ -1,263 +1,315 @@
-// Pedestrians: Solmar City residents walking the sidewalks.
-// Each one wanders between sidewalk points at its own pace, in its own
-// shirt colour. They flee from fast cars, and they go down (then get back
-// up and run) when hit by a car or punched — which the police notice.
+// pedestrians.js — Solmar City residents walking the sidewalks.
+//
+// Each resident wanders between sidewalk points in their own shirt
+// colour, chats idly, and waves when Mara strolls past on foot. They flee
+// from fast cars, go down (then get back up and run) when hit or punched,
+// panic at gunfire, and the first three are tourists who stop at scenic
+// spots to take photos.
 import * as THREE from 'three';
 import { CITY, randomSidewalkPoint } from './city.js';
 import { createRng, rand, pick, clamp } from './utils.js';
 
-const SHIRTS = [0x2e6fd8, 0xd23b3b, 0x3fae6a, 0xf2c14e, 0x8a5fc0, 0xff7a2a, 0x7fb3c8, 0xe8e8e8, 0xc96f5a, 0x9db98a];
-const PANTS = [0x2e4a6b, 0x333333, 0x5a4a3a, 0x4a5a6b];
-// Things Solmar residents say out loud: greetings, complaints, panic.
+const SHIRT_COLORS = [0x2e6fd8, 0xd23b3b, 0x3fae6a, 0xf2c14e, 0x8a5fc0, 0xff7a2a, 0x7fb3c8, 0xe8e8e8, 0xc96f5a, 0x9db98a];
+const PANTS_COLORS = [0x2e4a6b, 0x333333, 0x5a4a3a, 0x4a5a6b];
+const SKIN_TONES = [0xd9a986, 0x8a5a3b, 0xe8b89a, 0x6b4a2a];
 const IDLE_BARKS = ['Nice day!', 'Hey, Mara!', 'Traffic again…', 'Go Solmar!', 'What a view!', 'Late for work!'];
 const SCARED_BARKS = ['Help!', 'Watch it!', 'Are you crazy?!', 'Somebody call the law!', 'Hey!'];
-const ANGRY_BARKS = ['Hey!', 'Watch where you\u2019re going!', 'Rude!', 'My shoes!'];
-// Phase 6: tourists — a few visitors who stop at the scenic spots and
-// take photos instead of walking the sidewalks all day.
+const ANGRY_BARKS = ['Hey!', 'Watch where you’re going!', 'Rude!', 'My shoes!'];
+const TOURIST_BARKS = ['Say cheese!', 'What a view!', 'Photo time!', 'For the album!'];
 const TOURIST_SPOTS = [
   { x: -40, z: 214, line: 'The bay at sunset…' },
   { x: 40, z: 300, line: 'The causeway!' },
   { x: 120, z: 390, line: 'The lighthouse!' },
   { x: 0, z: 124, line: 'Downtown!' },
 ];
-const TOURIST_BARKS = ['Say cheese!', 'What a view!', 'Photo time!', 'For the album!'];
 
-function buildPedFigure(shirt, pants, scale) {
-  const group = new THREE.Group();
-  const shirtMat = new THREE.MeshLambertMaterial({ color: shirt });
-  const pantsMat = new THREE.MeshLambertMaterial({ color: pants });
-  const skin = new THREE.MeshLambertMaterial({ color: pick(Math.random, [0xd9a986, 0x8a5a3b, 0xe8b89a, 0x6b4a2a]) });
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.8, 0.38), shirtMat);
-  torso.position.y = 1.12;
-  group.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), skin);
-  head.position.y = 1.78;
-  group.add(head);
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.72, 0.28), pantsMat);
-  legL.position.set(-0.17, 0.36, 0);
-  group.add(legL);
-  const legR = legL.clone();
-  legR.position.x = 0.17;
-  group.add(legR);
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.62, 0.22), shirtMat);
-  armL.position.set(-0.43, 1.12, 0);
-  group.add(armL);
-  const armR = armL.clone();
-  armR.position.x = 0.43;
-  group.add(armR);
-  group.scale.setScalar(scale);
-  return { group, parts: { legL, legR, armL, armR } };
+/** Wrap an angle to [-PI, PI] without importing the angle helpers. */
+function wrapPi(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
 }
 
-/** Spawn `count` pedestrians. Returns { peds, update, nearest, knockDown, place }. */
 export function spawnPedestrians(scene, seed, count = 26) {
   const rng = createRng(seed * 104729 + 7);
-  const peds = [];
-  for (let i = 0; i < count; i++) {
-    const spot = randomSidewalkPoint(rng);
-    const { group, parts } = buildPedFigure(pick(rng, SHIRTS), pick(rng, PANTS), rand(rng, 0.92, 1.08));
-    group.position.set(spot.x, 0, spot.z);
-    scene.add(group);
-    const target = randomSidewalkPoint(rng);
-    peds.push({
-      group, parts,
-      pos: new THREE.Vector3(spot.x, 0, spot.z),
-      target: new THREE.Vector3(target.x, 0, target.z),
-      heading: rand(rng, 0, Math.PI * 2),
-      walkSpeed: rand(rng, 1.1, 2.1),
-      walkPhase: rand(rng, 0, 6),
-      fleeTimer: 0,
-      downTimer: 0,
-      down: false,
-      barkTimer: rand(rng, 6, 20), // idle chatter, every few seconds
-      barkSprite: null,
-      barkLife: 0,
-      // Phase 6: the first three residents are tourists — they wander
-      // between the scenic spots and stop to take photos there.
-      tourist: i < 3,
-      photoTimer: rand(rng, 4, 12),
-      photoPause: 0,
-      // Phase 7: wave timer — counts down while the arm stays raised.
-      waveTimer: 0,
-    });
-  }
 
-  // A floating speech bubble over a pedestrian's head, drawn on a canvas.
-  function makeBarkSprite(text) {
+  /** Rounded speech-bubble texture; the font shrinks to fit long lines. */
+  function bubbleTexture(text) {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 72;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.beginPath();
-    ctx.roundRect(4, 4, 248, 56, 14);
-    ctx.fill();
-    ctx.fillStyle = '#1c1f24';
-    ctx.font = 'bold 26px Verdana, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, 128, 42);
+    const g = canvas.getContext('2d');
+    const r = 14;
+    g.beginPath();
+    g.moveTo(r, 0);
+    g.lineTo(256 - r, 0);
+    g.arcTo(256, 0, 256, r, r);
+    g.lineTo(256, 72 - r);
+    g.arcTo(256, 72, 256 - r, 72, r);
+    g.lineTo(r, 72);
+    g.arcTo(0, 72, 0, 72 - r, r);
+    g.lineTo(0, r);
+    g.arcTo(0, 0, r, 0, r);
+    g.closePath();
+    g.fillStyle = 'rgba(255, 253, 245, 0.96)';
+    g.fill();
+    let size = 26;
+    g.font = `bold ${size}px Verdana`;
+    while (size > 14 && g.measureText(text).width > 232) {
+      size -= 2;
+      g.font = `bold ${size}px Verdana`;
+    }
+    g.fillStyle = '#222222';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, 128, 38);
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
-    sprite.scale.set(4.4, 1.24, 1);
-    return sprite;
+    return tex;
   }
 
-  /** Put words over a pedestrian's head for a couple of seconds. */
+  /** Put a speech bubble over a ped's head (replaces any old one). */
   function bark(p, text, life = 1.8) {
     if (!p || p.down) return;
     if (p.barkSprite) {
       p.group.remove(p.barkSprite);
       p.barkSprite.material.map.dispose();
       p.barkSprite.material.dispose();
+      p.barkSprite = null;
     }
-    p.barkSprite = makeBarkSprite(text);
-    p.barkSprite.position.y = 2.7;
-    p.group.add(p.barkSprite);
+    const mat = new THREE.SpriteMaterial({ map: bubbleTexture(text), transparent: true });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(4.4, 1.24, 1);
+    sprite.position.set(0, 2.7, 0);
+    p.group.add(sprite);
+    p.barkSprite = sprite;
     p.barkLife = life;
+    p.barkTotal = life;
     p.barkTimer = rand(rng, 8, 22);
   }
 
-  function pickNewTarget(p) {
-    const t = randomSidewalkPoint(rng);
-    // Prefer a target not too far away so peds stay in their neighbourhood.
-    p.target.set(t.x, 0, t.z);
+  function disposeBubble(p) {
+    if (!p.barkSprite) return;
+    p.group.remove(p.barkSprite);
+    p.barkSprite.material.map.dispose();
+    p.barkSprite.material.dispose();
+    p.barkSprite = null;
   }
 
-  /**
-   * Walk, flee and recover. threats: { playerPos, playerCar, playerInCar,
-   *   playerSpeed, trafficCars, policeCars } — any fast car nearby spooks
-   *   a pedestrian into a run.
-   */
+  /** Run away from a point: pick a target far in the opposite direction. */
+  function fleeFrom(p, fromX, fromZ, dist, duration) {
+    let dx = p.pos.x - fromX;
+    let dz = p.pos.z - fromZ;
+    const len = Math.hypot(dx, dz) || 1;
+    dx /= len;
+    dz /= len;
+    p.target.set(p.pos.x + dx * dist, 0, p.pos.z + dz * dist);
+    p.fleeTimer = duration;
+  }
+
+  /** One resident: boxy figure, random colours, random pace and scale. */
+  function buildPed(i) {
+    const shirtMat = new THREE.MeshLambertMaterial({ color: pick(rng, SHIRT_COLORS) });
+    const pantsMat = new THREE.MeshLambertMaterial({ color: pick(rng, PANTS_COLORS) });
+    const skinMat = new THREE.MeshLambertMaterial({ color: pick(rng, SKIN_TONES) });
+    const group = new THREE.Group();
+    const add = (geo, mat, x, y, z) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      group.add(m);
+      return m;
+    };
+    add(new THREE.BoxGeometry(0.66, 0.8, 0.38), shirtMat, 0, 1.12, 0);
+    add(new THREE.SphereGeometry(0.24, 12, 10), skinMat, 0, 1.78, 0);
+    const legL = add(new THREE.BoxGeometry(0.24, 0.72, 0.28), pantsMat, -0.17, 0.36, 0);
+    const legR = add(new THREE.BoxGeometry(0.24, 0.72, 0.28), pantsMat, 0.17, 0.36, 0);
+    const armL = add(new THREE.BoxGeometry(0.18, 0.62, 0.22), shirtMat, -0.43, 1.12, 0);
+    const armR = add(new THREE.BoxGeometry(0.18, 0.62, 0.22), shirtMat, 0.43, 1.12, 0);
+    group.scale.setScalar(rand(rng, 0.92, 1.08));
+
+    const spot = randomSidewalkPoint(rng);
+    const dest = randomSidewalkPoint(rng);
+    const ped = {
+      group,
+      parts: { legL, legR, armL, armR },
+      pos: new THREE.Vector3(spot.x, 0, spot.z),
+      target: new THREE.Vector3(dest.x, 0, dest.z),
+      heading: rand(rng, 0, Math.PI * 2),
+      walkSpeed: rand(rng, 1.1, 2.1),
+      walkPhase: rand(rng, 0, 6),
+      fleeTimer: 0,
+      downTimer: 0,
+      down: false,
+      barkTimer: rand(rng, 6, 20),
+      barkSprite: null,
+      barkLife: 0,
+      barkTotal: 1,
+      tourist: i < 3,
+      photoTimer: rand(rng, 4, 12),
+      photoPause: 0,
+      waveTimer: 0,
+    };
+    group.position.copy(ped.pos);
+    group.rotation.y = ped.heading;
+    scene.add(group);
+    return ped;
+  }
+
+  const peds = [];
+  for (let i = 0; i < count; i++) peds.push(buildPed(i));
+
   function update(dt, threats) {
+    const playerPos = threats.playerPos;
+
+    // Every car that can scare a ped, with its speed attached.
     const cars = [];
-    if (threats.playerInCar && threats.playerCar) cars.push({ pos: threats.playerCar.pos, speed: Math.abs(threats.playerCar.speed || 0) });
-    for (const w of threats.trafficCars || []) cars.push({ pos: w.car.pos, speed: w.speed || 0 });
-    for (const pc of threats.policeCars || []) cars.push({ pos: pc.car.pos, speed: Math.abs(pc.car.speed || 0) });
+    if (threats.playerInCar && threats.playerCar) {
+      cars.push({ x: threats.playerCar.pos.x, z: threats.playerCar.pos.z, speed: Math.abs(threats.playerCar.speed) });
+    }
+    for (const t of threats.trafficCars || []) {
+      const c = t.car || t;
+      cars.push({ x: c.pos.x, z: c.pos.z, speed: Math.abs(t.speed ?? c.speed ?? 0) });
+    }
+    for (const u of threats.policeCars || []) {
+      const c = u.car || u;
+      cars.push({ x: c.pos.x, z: c.pos.z, speed: Math.abs(u.speed ?? c.speed ?? 0) });
+    }
 
     for (const p of peds) {
-      // Speech bubble lifetime: fade out, then drop the sprite.
+      // 1. Speech-bubble lifetime: fade, then remove and dispose.
       if (p.barkSprite) {
         p.barkLife -= dt;
-        p.barkSprite.material.opacity = Math.max(0, Math.min(1, p.barkLife));
-        if (p.barkLife <= 0) {
-          p.group.remove(p.barkSprite);
-          p.barkSprite.material.map.dispose();
-          p.barkSprite.material.dispose();
-          p.barkSprite = null;
-        }
+        if (p.barkLife <= 0) disposeBubble(p);
+        else p.barkSprite.material.opacity = clamp(p.barkLife / (p.barkTotal || 1), 0, 1);
       }
+
+      // 2. Down: count down, then stand up, flee, and complain.
       if (p.down) {
         p.downTimer -= dt;
         if (p.downTimer <= 0) {
           p.down = false;
           p.group.rotation.x = 0;
           p.group.position.y = 0;
-          p.fleeTimer = 2.5; // get up and run away
+          fleeFrom(p, playerPos ? playerPos.x : p.pos.x, playerPos ? playerPos.z : p.pos.z, 25, 2.5);
           bark(p, pick(rng, ANGRY_BARKS));
         }
         continue;
       }
-      // Gunfire: everyone nearby runs and screams.
+
+      // 3. Gunfire nearby: run 30m away from the shot.
       if (threats.gunshotPos && p.fleeTimer <= 0) {
-        const gd = Math.hypot(threats.gunshotPos.x - p.pos.x, threats.gunshotPos.z - p.pos.z);
-        if (gd < 26) {
-          p.fleeTimer = 2.8;
-          const away = Math.atan2(p.pos.x - threats.gunshotPos.x, p.pos.z - threats.gunshotPos.z);
-          p.target.set(p.pos.x + Math.sin(away) * 30, 0, p.pos.z + Math.cos(away) * 30);
+        const d = Math.hypot(p.pos.x - threats.gunshotPos.x, p.pos.z - threats.gunshotPos.z);
+        if (d < 26) {
+          fleeFrom(p, threats.gunshotPos.x, threats.gunshotPos.z, 30, 2.8);
           bark(p, pick(rng, SCARED_BARKS));
         }
       }
-      // Idle chatter: a resident pipes up now and then when calm.
-      if (p.fleeTimer <= 0) {
+
+      const calm = p.fleeTimer <= 0;
+
+      // 4. Idle chatter while calm.
+      if (calm) {
         p.barkTimer -= dt;
         if (p.barkTimer <= 0) bark(p, pick(rng, IDLE_BARKS));
       }
-      // Phase 7: a wave — when Mara strolls past within 3m on foot, a
-      // calm resident raises an arm and says hello instead of walking on.
-      if (p.fleeTimer <= 0 && !threats.playerInCar && threats.playerPos) {
-        const pd = Math.hypot(threats.playerPos.x - p.pos.x, threats.playerPos.z - p.pos.z);
-        if (pd < 3 && p.barkTimer > 5) {
+
+      // 5. Wave when Mara strolls past on foot.
+      if (calm && !threats.playerInCar && playerPos) {
+        const d = Math.hypot(p.pos.x - playerPos.x, p.pos.z - playerPos.z);
+        if (d < 3 && p.barkTimer > 5) {
           p.waveTimer = 1.2;
           bark(p, 'Hey, Mara!');
         }
       }
-      // Flee: a fast car within 7m sends this ped running away from it.
-      if (p.fleeTimer <= 0) {
+
+      // 6. Flee from any fast car that gets too close.
+      if (calm) {
         for (const c of cars) {
-          const d = Math.hypot(c.pos.x - p.pos.x, c.pos.z - p.pos.z);
-          if (c.speed > 6 && d < 7) {
-            p.fleeTimer = 1.6;
-            const away = Math.atan2(p.pos.x - c.pos.x, p.pos.z - c.pos.z);
-            p.target.set(p.pos.x + Math.sin(away) * 25, 0, p.pos.z + Math.cos(away) * 25);
+          if (c.speed <= 6) continue;
+          const d = Math.hypot(p.pos.x - c.x, p.pos.z - c.z);
+          if (d < 7) {
+            fleeFrom(p, c.x, c.z, 25, 1.6);
             if (rng() < 0.5) bark(p, pick(rng, SCARED_BARKS));
             break;
           }
         }
       }
+
+      // 7. Count the flee timer down.
       if (p.fleeTimer > 0) p.fleeTimer -= dt;
-      // Phase 6: tourists stop at the scenic spots and take photos.
+
+      // 8. Tourists: pause at scenic spots for a photo, or walk to one.
+      let paused = false;
       if (p.tourist && p.fleeTimer <= 0) {
-        p.photoTimer -= dt;
         if (p.photoPause > 0) {
           p.photoPause -= dt;
-          // Stand still, camera arm raised, while the photo happens.
-          p.parts.armR.rotation.x = -2.4;
-          continue;
-        }
-        if (p.photoTimer <= 0) {
-          let spot = null;
-          let bestD = 12;
-          for (const s of TOURIST_SPOTS) {
-            const d = Math.hypot(s.x - p.pos.x, s.z - p.pos.z);
-            if (d < bestD) { bestD = d; spot = s; }
-          }
-          if (spot) {
-            p.photoPause = 3;
-            p.photoTimer = rand(rng, 10, 20);
-            bark(p, pick(rng, TOURIST_BARKS));
-          } else {
-            const s = pick(rng, TOURIST_SPOTS);
-            p.target.set(s.x + rand(rng, -3, 3), 0, s.z + rand(rng, -3, 3));
-            p.photoTimer = rand(rng, 8, 16);
+          paused = true;
+        } else {
+          p.photoTimer -= dt;
+          if (p.photoTimer <= 0) {
+            let spot = null;
+            for (const s of TOURIST_SPOTS) {
+              if (Math.hypot(p.pos.x - s.x, p.pos.z - s.z) < 12) { spot = s; break; }
+            }
+            if (spot) {
+              p.photoPause = 3;
+              p.photoTimer = rand(rng, 10, 20);
+              bark(p, pick(rng, TOURIST_BARKS));
+              paused = true;
+            } else {
+              const s = pick(rng, TOURIST_SPOTS);
+              p.target.set(s.x + rand(rng, -3, 3), 0, s.z + rand(rng, -3, 3));
+              p.photoTimer = rand(rng, 8, 16);
+            }
           }
         }
       }
-      const dx = p.target.x - p.pos.x;
-      const dz = p.target.z - p.pos.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist < 1.2) {
-        pickNewTarget(p);
-        continue;
+
+      // 9. Walk toward the target (or stand still for a photo).
+      if (!paused) {
+        const toTarget = Math.hypot(p.target.x - p.pos.x, p.target.z - p.pos.z);
+        if (toTarget < 1.2) {
+          // New sidewalk target, preferring one nearby so peds stay local.
+          let best = null;
+          let bestD = Infinity;
+          for (let k = 0; k < 4; k++) {
+            const cand = randomSidewalkPoint(rng);
+            const d = Math.hypot(cand.x - p.pos.x, cand.z - p.pos.z);
+            if (d < bestD) { bestD = d; best = cand; }
+            if (d < 60) break;
+          }
+          p.target.set(best.x, 0, best.z);
+        } else {
+          const fleeingNow = p.fleeTimer > 0;
+          const speed = (fleeingNow ? 5.2 : p.walkSpeed) * (threats.raining ? 0.75 : 1);
+          const wantHeading = Math.atan2(p.target.x - p.pos.x, p.target.z - p.pos.z);
+          p.heading += clamp(wrapPi(wantHeading - p.heading), -dt * 8, dt * 8);
+          p.pos.x += Math.sin(p.heading) * speed * dt;
+          p.pos.z += Math.cos(p.heading) * speed * dt;
+          p.pos.x = clamp(p.pos.x, -CITY.bound, CITY.bound);
+          p.pos.z = clamp(p.pos.z, -CITY.bound, CITY.bound + 30);
+          p.walkPhase += dt * (fleeingNow ? 14 : 8);
+        }
       }
-      const speed = p.fleeTimer > 0 ? 5.2 : p.walkSpeed * (threats.raining ? 0.75 : 1); // rain: residents hurry, heads down
-      const wantHeading = Math.atan2(dx, dz);
-      let dh = wantHeading - p.heading;
-      while (dh > Math.PI) dh -= Math.PI * 2;
-      while (dh < -Math.PI) dh += Math.PI * 2;
-      p.heading += dh * Math.min(1, dt * 8);
-      p.pos.x += Math.sin(p.heading) * speed * dt;
-      p.pos.z += Math.cos(p.heading) * speed * dt;
-      p.pos.x = clamp(p.pos.x, -CITY.bound, CITY.bound);
-      p.pos.z = clamp(p.pos.z, -CITY.bound, CITY.bound + 30);
-      p.walkPhase += dt * (p.fleeTimer > 0 ? 14 : 8);
       p.group.position.copy(p.pos);
       p.group.rotation.y = p.heading;
-      const swing = Math.sin(p.walkPhase) * 0.5;
+
+      // Limb swing; the right arm waves, or holds the camera up for a photo.
+      const swing = paused ? 0 : Math.sin(p.walkPhase) * 0.5;
       p.parts.legL.rotation.x = swing;
       p.parts.legR.rotation.x = -swing;
       p.parts.armL.rotation.x = -swing * 0.8;
-      // A waving arm stays raised while the timer runs, over the swing.
       if (p.waveTimer > 0) {
         p.waveTimer -= dt;
         p.parts.armR.rotation.x = -2.6;
+      } else if (paused) {
+        p.parts.armR.rotation.x = -2.4;
       } else {
         p.parts.armR.rotation.x = swing * 0.8;
       }
     }
   }
 
-  /** Nearest pedestrian to a point, within maxDist (0 = none in range). */
   function nearest(pos, maxDist) {
     let best = null;
     let bestD = maxDist;
@@ -269,7 +321,6 @@ export function spawnPedestrians(scene, seed, count = 26) {
     return best;
   }
 
-  /** Knock a pedestrian down for a few seconds (punch or car hit). */
   function knockDown(p) {
     if (!p || p.down) return;
     p.down = true;
@@ -278,14 +329,16 @@ export function spawnPedestrians(scene, seed, count = 26) {
     p.group.position.y = 0.35;
   }
 
-  // Stage one pedestrian at an exact spot (used by ?shot= poses).
+  /** Stage one ped at an exact spot (screenshot poses). */
   function place(i, x, z) {
     const p = peds[i % peds.length];
     p.pos.set(x, 0, z);
     p.target.set(x + 8, 0, z + 4);
     p.down = false;
+    p.downTimer = 0;
     p.group.rotation.x = 0;
     p.group.position.copy(p.pos);
+    p.group.rotation.y = p.heading;
     return p;
   }
 

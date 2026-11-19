@@ -1,115 +1,109 @@
-// Weapons: Mara's pistol, bought at the gun shop on the downtown corner.
-// A pistol changes the game: Mara can fight back instead of only running,
-// but every shot in public is a crime — firing near witnesses raises heat,
-// and hitting a patrol car makes the law hunt her harder. Ammo is scarce:
+// weapons.js — Mara's pistol, the melee bat, and spare rounds.
+//
+// All three are sold at the gun shop on the downtown corner. A pistol
+// changes the game: Mara can fight back instead of only running, but every
+// shot in public is a crime — firing near witnesses raises heat, and
+// hitting a patrol car makes the law hunt her harder. Ammo is scarce:
 // a 12-round magazine, spare rounds bought with the gun, R reloads.
-// Phase 4: the pistol shares the C key's neighbourhood, not its job — C is
-// the camera on the Shutterbug tour, so the pistol stays on the mouse click
-// and never fires while Mara is framing a photo.
 import * as THREE from 'three';
 
 export const GUN_PRICE = 400;
 export const MAG_SIZE = 12;
 export const SHOT_RANGE = 46;
 export const SHOP_POS = new THREE.Vector3(10.5, 0, 62);
-// Phase 6: the melee bat — cheap, longer reach than a bare fist, no ammo.
 export const BAT_PRICE = 50;
 export const BAT_REACH = 3.6;
-// Phase 7: a box of reserve rounds — $60 for 24, sold at the same shop.
 export const AMMO_BOX_PRICE = 60;
 export const AMMO_BOX_ROUNDS = 24;
 
-// A canvas sign for the shop front: green board, white lettering, no assets.
-function shopSignTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#123524';
-  ctx.fillRect(0, 0, 256, 128);
-  ctx.strokeStyle = '#7dff8a';
-  ctx.lineWidth = 6;
-  ctx.strokeRect(6, 6, 244, 116);
-  ctx.fillStyle = '#7dff8a';
-  ctx.font = 'bold 44px Verdana, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('GUN SHOP', 128, 58);
-  ctx.fillStyle = '#ffd23f';
-  ctx.font = 'bold 30px Verdana, sans-serif';
-  ctx.fillText('PISTOL $400', 128, 102);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-// A boxy little pistol, floating and spinning above the shop marker.
-function buildPistolMesh() {
-  const group = new THREE.Group();
-  const dark = new THREE.MeshLambertMaterial({ color: 0x1c1f24 });
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.22), dark);
-  grip.position.y = -0.18;
-  grip.rotation.z = 0.25;
-  group.add(grip);
-  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 0.9), dark);
-  barrel.position.set(0, 0.12, 0.3);
-  group.add(barrel);
-  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.08), new THREE.MeshLambertMaterial({ color: 0xffd23f }));
-  sight.position.set(0, 0.28, -0.05);
-  group.add(sight);
-  return group;
-}
-
-/** Create the weapons system. Returns the gun shop + pistol state. */
 export function createWeapons(scene) {
-  // Shop marker: sign board on two posts + a spinning pistol + a green beam.
+  // --- The gun shop, at SHOP_POS ---------------------------------------
   const shop = new THREE.Group();
+  shop.position.copy(SHOP_POS);
+
+  // Sign board: dark green, bright border, gold price line.
+  const signCanvas = document.createElement('canvas');
+  signCanvas.width = 256;
+  signCanvas.height = 128;
+  const sg = signCanvas.getContext('2d');
+  sg.fillStyle = '#123524';
+  sg.fillRect(0, 0, 256, 128);
+  sg.strokeStyle = '#2eff7a';
+  sg.lineWidth = 6;
+  sg.strokeRect(6, 6, 244, 116);
+  sg.fillStyle = '#ffffff';
+  sg.font = 'bold 44px Verdana';
+  sg.textAlign = 'center';
+  sg.fillText('GUN SHOP', 128, 58);
+  sg.fillStyle = '#ffd23f';
+  sg.font = 'bold 30px Verdana';
+  sg.fillText('PISTOL $400', 128, 102);
+  const signTex = new THREE.CanvasTexture(signCanvas);
+  signTex.colorSpace = THREE.SRGBColorSpace;
   const sign = new THREE.Mesh(
     new THREE.PlaneGeometry(6.4, 3.2),
-    new THREE.MeshLambertMaterial({ map: shopSignTexture() }),
+    new THREE.MeshBasicMaterial({ map: signTex })
   );
-  sign.position.set(0, 4.4, 0);
+  sign.position.y = 4.4;
   shop.add(sign);
+
+  // Two posts holding the sign up.
   const postMat = new THREE.MeshLambertMaterial({ color: 0x2e3438 });
-  for (const x of [-3, 3]) {
+  for (const sx of [-3, 3]) {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4.6, 6), postMat);
-    post.position.set(x, 2.3, 0);
+    post.position.set(sx, 2.3, 0);
     shop.add(post);
   }
-  const pistol = buildPistolMesh();
-  pistol.position.set(0, 2.6, 0);
+
+  // Spinning display pistol: tilted grip, barrel, gold sight.
+  const pistol = new THREE.Group();
+  const gunmetal = new THREE.MeshLambertMaterial({ color: 0x222222 });
+  const brass = new THREE.MeshLambertMaterial({ color: 0xffd23f });
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.12), gunmetal);
+  grip.position.set(-0.18, -0.12, 0);
+  grip.rotation.z = 0.35;
+  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.13, 0.12), gunmetal);
+  barrel.position.set(0.12, 0.12, 0);
+  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.07), brass);
+  sight.position.set(0.3, 0.22, 0);
+  pistol.add(grip, barrel, sight);
   pistol.scale.setScalar(1.6);
+  pistol.position.y = 2.6;
   shop.add(pistol);
+
+  // Green beacon beam so the shop reads from across downtown.
   const beam = new THREE.Mesh(
     new THREE.CylinderGeometry(0.6, 1.4, 18, 10, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0x7dff8a, transparent: true, opacity: 0.22, side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ color: 0x7dff8a, transparent: true, opacity: 0.22, side: THREE.DoubleSide })
   );
   beam.position.y = 9;
   shop.add(beam);
-  // Phase 6: the bat for sale — a wooden slugger leaning on the shop post.
+
+  // A wooden bat for sale, leaning on the right post.
   const batMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(0.09, 0.13, 1.5, 8),
-    new THREE.MeshLambertMaterial({ color: 0x8a6a45 }),
+    new THREE.MeshLambertMaterial({ color: 0x8a6a45 })
   );
   batMesh.position.set(3.4, 1.4, 0.6);
   batMesh.rotation.z = 0.35;
   shop.add(batMesh);
-  shop.position.copy(SHOP_POS);
   scene.add(shop);
 
-  // Tracer: a bright line from the muzzle to the hit point, fades fast.
+  // --- Shot feedback: tracer line + muzzle flash -----------------------
   const tracerGeo = new THREE.BufferGeometry();
   tracerGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
-  const tracer = new THREE.Line(tracerGeo, new THREE.LineBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0 }));
+  const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0 });
+  const tracer = new THREE.Line(tracerGeo, tracerMat);
   tracer.frustumCulled = false;
   scene.add(tracer);
-  // Muzzle flash: a small star of planes at the barrel tip.
-  const flashMat = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0 });
+
+  const flashMat = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0, side: THREE.DoubleSide });
   const flash = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), flashMat);
   scene.add(flash);
 
   const weapons = {
     owned: false,
-    bat: false, // Phase 6: the $50 melee bat from the same shop
+    bat: false,
     mag: 0,
     reserve: 0,
     cooldown: 0,
@@ -117,16 +111,25 @@ export function createWeapons(scene) {
     flashTimer: 0,
     tracerTimer: 0,
     spinTimer: 0,
-    lastShotPos: null, // where the last shot went off (peds flee from it)
+    lastShotPos: null,
     shotsFired: 0,
+    nearShop,
+    buy,
+    buyBat,
+    buyAmmo,
+    meleeReach,
+    ammoText,
+    shoot,
+    reload,
+    stageOwned,
+    update,
+    shopPos: SHOP_POS,
   };
 
-  /** True when Mara stands close enough to buy from the shop. */
   function nearShop(pos, maxDist = 5) {
-    return Math.hypot(pos.x - SHOP_POS.x, pos.z - SHOP_POS.z) < maxDist;
+    return Math.hypot(pos.x - SHOP_POS.x, pos.z - SHOP_POS.z) <= maxDist;
   }
 
-  /** Buy the pistol. Returns 'ok', 'owned' or 'broke'. Money moves in main. */
   function buy(money) {
     if (weapons.owned) return 'owned';
     if (money < GUN_PRICE) return 'broke';
@@ -136,10 +139,6 @@ export function createWeapons(scene) {
     return 'ok';
   }
 
-  /**
-   * Phase 6: buy the bat at the same shop — $50, no ammo, and a longer
-   * swing than a bare fist. Returns 'ok', 'owned' or 'broke'.
-   */
   function buyBat(money) {
     if (weapons.bat) return 'owned';
     if (money < BAT_PRICE) return 'broke';
@@ -147,11 +146,6 @@ export function createWeapons(scene) {
     return 'ok';
   }
 
-  /**
-   * Phase 7: buy a box of reserve rounds at the shop — $60 for 24.
-   * Returns 'ok', 'no-gun' (buy the pistol first) or 'broke'. Money
-   * moves in main.
-   */
   function buyAmmo(money) {
     if (!weapons.owned) return 'no-gun';
     if (money < AMMO_BOX_PRICE) return 'broke';
@@ -159,12 +153,10 @@ export function createWeapons(scene) {
     return 'ok';
   }
 
-  /** Melee reach: the bat's 3.6m when owned, otherwise the bare-fist 2.4m. */
   function meleeReach() {
     return weapons.bat ? BAT_REACH : 2.4;
   }
 
-  /** HUD line: pistol + rounds, or the shop hint when unarmed. */
   function ammoText() {
     if (!weapons.owned) return 'NO GUN — visit the GUN SHOP ($400)';
     if (weapons.mag === 0 && weapons.reserve === 0) return 'OUT OF AMMO — G at the shop, $60 a box';
@@ -172,24 +164,10 @@ export function createWeapons(scene) {
     return `PISTOL ${weapons.mag} / ${weapons.reserve}`;
   }
 
-  // Project a target onto the shot ray: returns the along-ray distance when
-  // the target sits inside the cone, otherwise Infinity.
-  function rayHit(origin, dir, targetPos, radius) {
-    const dx = targetPos.x - origin.x;
-    const dz = targetPos.z - origin.z;
-    const along = dx * dir.x + dz * dir.z;
-    if (along < 0.5 || along > SHOT_RANGE) return Infinity;
-    const px = dx - dir.x * along;
-    const pz = dz - dir.z * along;
-    const perp = Math.hypot(px, pz);
-    return perp < radius ? along : Infinity;
-  }
-
   /**
-   * Fire one round. origin: Mara's position, yaw: her facing (radians).
-   * targets: { peds, traffic, police } — the live systems to hit.
-   * Returns { kind, ... } or { kind: 'none' } / { kind: 'dry' } / null
-   * when the trigger is still on cooldown or Mara is reloading.
+   * Fire one round along `yaw` from `origin`. `targets` carries the
+   * pedestrians, traffic cars and police cars to test, plus (when the
+   * caller wires it) a knockDown for the peds system. Nearest hit wins.
    */
   function shoot(origin, yaw, targets) {
     if (!weapons.owned || weapons.cooldown > 0 || weapons.reloadTimer > 0) return null;
@@ -200,52 +178,84 @@ export function createWeapons(scene) {
     weapons.cooldown = 0.22;
     weapons.mag -= 1;
     weapons.shotsFired += 1;
-    const dir = { x: Math.sin(yaw), z: Math.cos(yaw) };
-    const muzzle = new THREE.Vector3(origin.x + dir.x * 1.1, 1.45, origin.z + dir.z * 1.1);
-    weapons.lastShotPos = muzzle.clone();
 
-    // Nearest thing inside the shot cone wins: peds, traffic, patrol cars.
-    let best = null;
-    let bestD = SHOT_RANGE;
-    for (const p of targets.peds?.peds || []) {
-      if (p.down) continue;
-      const d = rayHit(origin, dir, p.pos, 1.4);
-      if (d < bestD) { bestD = d; best = { kind: 'ped', ped: p }; }
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
+    const muzzle = new THREE.Vector3(origin.x + fx * 1.1, 1.45, origin.z + fz * 1.1);
+
+    let bestKind = 'none';
+    let bestDist = SHOT_RANGE;
+    let bestPed = null;
+    let bestCar = null;
+    let bestUnit = null;
+
+    // A target counts when it sits inside the cone: 0.5..range along the
+    // ray and closer than its radius perpendicular to it.
+    const consider = (pos, radius, kind, ref) => {
+      const dx = pos.x - muzzle.x;
+      const dz = pos.z - muzzle.z;
+      const along = dx * fx + dz * fz;
+      if (along < 0.5 || along > SHOT_RANGE) return;
+      if (Math.abs(dx * fz - dz * fx) >= radius) return;
+      if (along < bestDist) {
+        bestDist = along;
+        bestKind = kind;
+        bestPed = ref.ped || null;
+        bestCar = ref.car || null;
+        bestUnit = ref.unit || null;
+      }
+    };
+
+    const t = targets || {};
+    for (const p of t.peds || t.pedestrians || []) {
+      if (!p.down) consider(p.pos, 1.4, 'ped', { ped: p });
     }
-    for (const w of targets.traffic?.cars || []) {
-      const d = rayHit(origin, dir, w.car.pos, 2.4);
-      if (d < bestD) { bestD = d; best = { kind: 'traffic', car: w.car }; }
+    for (const entry of t.traffic || t.trafficCars || []) {
+      const c = entry.car || entry;
+      consider(c.pos, 2.4, 'traffic', { car: c });
     }
-    for (const unit of targets.police?.cars || []) {
-      const d = rayHit(origin, dir, unit.car.pos, 2.4);
-      if (d < bestD) { bestD = d; best = { kind: 'police', car: unit.car, unit }; }
+    for (const entry of t.police || t.policeCars || []) {
+      const c = entry.car || entry;
+      consider(c.pos, 2.4, 'police', { car: c, unit: entry });
     }
-    const end = new THREE.Vector3(origin.x + dir.x * bestD, 1.3, origin.z + dir.z * bestD);
-    const posAttr = tracer.geometry.getAttribute('position');
-    posAttr.setXYZ(0, muzzle.x, muzzle.y, muzzle.z);
-    posAttr.setXYZ(1, end.x, end.y, end.z);
-    posAttr.needsUpdate = true;
-    tracer.material.opacity = 0.95;
+
+    // Draw the tracer to the hit point (or the full range on a miss).
+    const endX = muzzle.x + fx * bestDist;
+    const endZ = muzzle.z + fz * bestDist;
+    const attr = tracerGeo.attributes.position;
+    attr.setXYZ(0, muzzle.x, muzzle.y, muzzle.z);
+    attr.setXYZ(1, endX, muzzle.y, endZ);
+    attr.needsUpdate = true;
+    tracerMat.opacity = 0.95;
     weapons.tracerTimer = 0.09;
     flash.position.copy(muzzle);
-    flash.material.opacity = 1;
+    flashMat.opacity = 1;
     weapons.flashTimer = 0.06;
-    if (best) {
-      if (best.kind === 'ped') targets.peds.knockDown(best.ped);
-      return { kind: best.kind, car: best.car || null, unit: best.unit || null, dist: bestD };
+    weapons.lastShotPos = muzzle.clone();
+
+    if (bestKind === 'ped' && bestPed) {
+      if (typeof t.knockDown === 'function') t.knockDown(bestPed);
+      else if (typeof bestPed.knockDown === 'function') bestPed.knockDown();
+      else {
+        bestPed.down = true;
+        bestPed.downTimer = 2.8;
+        bestPed.group.rotation.x = -Math.PI / 2 + 0.15;
+        bestPed.group.position.y = 0.35;
+      }
+      return { kind: 'ped', dist: bestDist };
     }
-    return { kind: 'none', dist: bestD };
+    if (bestKind === 'traffic') return { kind: 'traffic', car: bestCar, dist: bestDist };
+    if (bestKind === 'police') return { kind: 'police', car: bestCar, unit: bestUnit, dist: bestDist };
+    return { kind: 'none', dist: bestDist };
   }
 
-  /** Start a reload: 1.1s, then the magazine refills from the reserve. */
   function reload() {
-    if (!weapons.owned || weapons.reloadTimer > 0) return false;
-    if (weapons.mag >= MAG_SIZE || weapons.reserve <= 0) return false;
+    if (!weapons.owned || weapons.reloadTimer > 0 || weapons.mag >= MAG_SIZE || weapons.reserve <= 0) return false;
     weapons.reloadTimer = 1.1;
     return true;
   }
 
-  /** Stage the pistol for a screenshot pose (bought, loaded). */
+  /** Mark the pistol owned with the given ammo (screenshot poses). */
   function stageOwned(mag = MAG_SIZE, reserve = 36) {
     weapons.owned = true;
     weapons.mag = mag;
@@ -256,37 +266,26 @@ export function createWeapons(scene) {
     weapons.spinTimer += dt;
     pistol.rotation.y = weapons.spinTimer * 1.4;
     pistol.position.y = 2.6 + Math.sin(weapons.spinTimer * 2) * 0.25;
-    if (weapons.cooldown > 0) weapons.cooldown -= dt;
+    if (weapons.cooldown > 0) weapons.cooldown = Math.max(0, weapons.cooldown - dt);
     if (weapons.reloadTimer > 0) {
       weapons.reloadTimer -= dt;
       if (weapons.reloadTimer <= 0) {
-        const need = MAG_SIZE - weapons.mag;
-        const take = Math.min(need, weapons.reserve);
-        weapons.mag += take;
-        weapons.reserve -= take;
+        weapons.reloadTimer = 0;
+        const moved = Math.min(MAG_SIZE - weapons.mag, weapons.reserve);
+        weapons.mag += moved;
+        weapons.reserve -= moved;
       }
     }
     if (weapons.tracerTimer > 0) {
       weapons.tracerTimer -= dt;
-      if (weapons.tracerTimer <= 0) tracer.material.opacity = 0;
+      if (weapons.tracerTimer <= 0) tracerMat.opacity = 0;
     }
     if (weapons.flashTimer > 0) {
       weapons.flashTimer -= dt;
-      flash.material.opacity = Math.max(0, weapons.flashTimer / 0.06);
+      flashMat.opacity = Math.max(0, weapons.flashTimer / 0.06);
       flash.rotation.z += dt * 20;
     }
   }
 
-  weapons.nearShop = nearShop;
-  weapons.buy = buy;
-  weapons.buyBat = buyBat;
-  weapons.buyAmmo = buyAmmo;
-  weapons.meleeReach = meleeReach;
-  weapons.ammoText = ammoText;
-  weapons.shoot = shoot;
-  weapons.reload = reload;
-  weapons.stageOwned = stageOwned;
-  weapons.update = update;
-  weapons.shopPos = SHOP_POS;
   return weapons;
 }
