@@ -94,15 +94,10 @@ export function createCombat() {
   function applyShotHit(hit) {
     if (!hit) return 0;
     if (hit.kind === 'ped') return 1;
-    if (hit.kind === 'traffic') {
+    if (hit.kind === 'traffic' || hit.kind === 'police') {
       const disabled = damageCar(hit.car, 1);
       if (disabled) hit.car.speed = 0;
-      return 1;
-    }
-    if (hit.kind === 'police') {
-      const disabled = damageCar(hit.car, 1);
-      if (disabled) hit.car.speed = 0;
-      return 2;
+      return hit.kind === 'police' ? 2 : 1;
     }
     return 0;
   }

@@ -61,9 +61,9 @@ export function lighthouseBeamIntensity(hour) {
 
 /** "07:30" / "23:05" style clock text for the HUD. */
 export function formatClock(hours) {
-  const h = Math.floor(((hours % 24) + 24) % 24);
-  const m = Math.floor((((hours % 24) + 24) % 24 - h) * 60);
-  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+  const h = ((hours % 24) + 24) % 24;
+  const hh = Math.floor(h);
+  return String(hh).padStart(2, '0') + ':' + String(Math.floor((h - hh) * 60)).padStart(2, '0');
 }
 
 /**
@@ -74,16 +74,6 @@ export function formatClock(hours) {
 export function isGoldenHour(hours) {
   const h = ((hours % 24) + 24) % 24;
   return h >= 17 && h < 19;
-}
-
-/**
- * Phase 7: true at dusk (19:00–20:30), the half-light between the
- * golden hour and the deep night, when the lamps are already on and the
- * moon is coming up.
- */
-export function isDusk(hours) {
-  const h = ((hours % 24) + 24) % 24;
-  return h >= 19 && h < 20.5;
 }
 
 /**
@@ -124,10 +114,7 @@ export function createDayNight(scene, city) {
     }
   }
   // A pale moon that only shows at night.
-  const moon = new THREE.Mesh(
-    new THREE.SphereGeometry(9, 12, 10),
-    new THREE.MeshBasicMaterial({ color: 0xe8eef7 }),
-  );
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(9, 12, 10), new THREE.MeshBasicMaterial({ color: 0xe8eef7 }));
   moon.position.set(-260, 190, -180);
   moon.visible = false;
   scene.add(moon);
@@ -175,10 +162,8 @@ export function createDayNight(scene, city) {
   }
 
   apply();
-  daynight.apply = apply;
-  daynight.setHours = setHours;
-  daynight.update = update;
-  daynight.clockText = () => formatClock(daynight.hours);
-  daynight.isGoldenHour = () => isGoldenHour(daynight.hours);
+  Object.assign(daynight, { apply, setHours, update,
+    clockText: () => formatClock(daynight.hours),
+    isGoldenHour: () => isGoldenHour(daynight.hours) });
   return daynight;
 }

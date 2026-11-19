@@ -10,48 +10,23 @@ import { VILLA_POS } from './island.js';
 import { formatMoney } from './utils.js';
 
 export const HOUSES = [
-  {
-    id: 'hut',
-    name: 'Beach Hut',
-    price: 1500,
-    door: { x: -93, z: 205 },
-    room: { x: -77, z: 205 },
-    wall: 0xf2e3c9,
-    roof: 0xc96f5a,
-  },
-  {
-    id: 'loft',
-    name: 'Downtown Loft',
-    price: 4000,
-    door: { x: 93, z: -93 },
-    room: { x: 109, z: -93 },
-    wall: 0x7fb3c8,
-    roof: 0x2e3438,
-  },
-  {
-    id: 'villa',
-    name: 'Island Villa',
-    price: 8000,
-    door: { x: VILLA_POS.x, z: VILLA_POS.z },
-    room: { x: VILLA_POS.x + 16, z: VILLA_POS.z },
-    wall: 0xe6d7b8,
-    roof: 0x3fae6a,
-  },
-  // Phase 7: the Lighthouse Cottage — the priciest roof in Solmar, a
-  // stone's throw from the lighthouse on the island's south shore.
-  {
-    id: 'cottage',
-    name: 'Lighthouse Cottage',
-    price: 12000,
-    door: { x: 140, z: 420 },
-    room: { x: 152, z: 420 },
-    wall: 0xd9a441,
-    roof: 0xd23b3b,
-  },
+  { id: 'hut', name: 'Beach Hut', price: 1500, door: { x: -93, z: 205 }, room: { x: -77, z: 205 }, wall: 0xf2e3c9, roof: 0xc96f5a },
+  { id: 'loft', name: 'Downtown Loft', price: 4000, door: { x: 93, z: -93 }, room: { x: 109, z: -93 }, wall: 0x7fb3c8, roof: 0x2e3438 },
+  { id: 'villa', name: 'Island Villa', price: 8000, door: { x: VILLA_POS.x, z: VILLA_POS.z }, room: { x: VILLA_POS.x + 16, z: VILLA_POS.z }, wall: 0xe6d7b8, roof: 0x3fae6a },
+  // Phase 7: the Lighthouse Cottage — the priciest roof in Solmar, a stone's throw from the lighthouse on the island's south shore.
+  { id: 'cottage', name: 'Lighthouse Cottage', price: 12000, door: { x: 140, z: 420 }, room: { x: 152, z: 420 }, wall: 0xd9a441, roof: 0xd23b3b },
 ];
 
 const ROOM_W = 11;
 const ROOM_D = 8;
+
+/** One mesh, positioned and added — the house builder's shorthand. */
+function box(parent, geo, mat, x, y, z) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
 
 export function createHousing(scene) {
   const housing = {
@@ -67,85 +42,31 @@ export function createHousing(scene) {
   for (const house of HOUSES) {
     const wallMat = new THREE.MeshLambertMaterial({ color: house.wall });
     const roofMat = new THREE.MeshLambertMaterial({ color: house.roof });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(9, 5, 8), wallMat);
-    body.position.set(house.door.x, 2.5, house.door.z - 8);
-    scene.add(body);
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(7.2, 3, 4), roofMat);
-    roof.position.set(house.door.x, 6.4, house.door.z - 8);
+    box(scene, new THREE.BoxGeometry(9, 5, 8), wallMat, house.door.x, 2.5, house.door.z - 8);
+    const roof = box(scene, new THREE.ConeGeometry(7.2, 3, 4), roofMat, house.door.x, 6.4, house.door.z - 8);
     roof.rotation.y = Math.PI / 4;
-    scene.add(roof);
     // The door itself: a dark slab with a gold knob, facing the street.
-    const door = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 3.4, 0.3),
-      new THREE.MeshLambertMaterial({ color: 0x5a4028 }),
-    );
-    door.position.set(house.door.x, 1.7, house.door.z - 3.9);
-    scene.add(door);
-    const knob = new THREE.Mesh(
-      new THREE.SphereGeometry(0.14, 8, 6),
-      new THREE.MeshBasicMaterial({ color: 0xffd23f }),
-    );
-    knob.position.set(house.door.x + 0.8, 1.7, house.door.z - 3.7);
-    scene.add(knob);
+    box(scene, new THREE.BoxGeometry(2.2, 3.4, 0.3), new THREE.MeshLambertMaterial({ color: 0x5a4028 }), house.door.x, 1.7, house.door.z - 3.9);
+    box(scene, new THREE.SphereGeometry(0.14, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd23f }), house.door.x + 0.8, 1.7, house.door.z - 3.7);
     // Price board beside the door until the house is bought.
-    const board = new THREE.Mesh(
-      new THREE.BoxGeometry(2.6, 1.4, 0.15),
-      new THREE.MeshLambertMaterial({ color: 0xf2f2f2 }),
-    );
-    board.position.set(house.door.x + 3.4, 2.2, house.door.z - 3.9);
-    scene.add(board);
-    house._board = board;
+    house._board = box(scene, new THREE.BoxGeometry(2.6, 1.4, 0.15), new THREE.MeshLambertMaterial({ color: 0xf2f2f2 }), house.door.x + 3.4, 2.2, house.door.z - 3.9);
 
     // The interior room: floor, three walls + a low front wall with a
     // doorway gap, a flat roof, and furniture.
     const room = new THREE.Group();
-    const floor = new THREE.Mesh(
-      new THREE.BoxGeometry(ROOM_W, 0.3, ROOM_D),
-      new THREE.MeshLambertMaterial({ color: 0x8a6a45 }),
-    );
-    floor.position.y = 0.15;
-    room.add(floor);
+    box(room, new THREE.BoxGeometry(ROOM_W, 0.3, ROOM_D), new THREE.MeshLambertMaterial({ color: 0x8a6a45 }), 0, 0.15, 0);
     const wallH = 3.6;
-    const mkWall = (w, d, x, z) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, d), wallMat);
-      m.position.set(x, wallH / 2, z);
-      room.add(m);
-    };
+    const mkWall = (w, d, x, z) => box(room, new THREE.BoxGeometry(w, wallH, d), wallMat, x, wallH / 2, z);
     mkWall(ROOM_W, 0.4, 0, -ROOM_D / 2);
     mkWall(ROOM_W, 0.4, 0, ROOM_D / 2);
     mkWall(0.4, ROOM_D, -ROOM_W / 2, 0);
     mkWall(0.4, ROOM_D, ROOM_W / 2, 0);
-    const ceil = new THREE.Mesh(
-      new THREE.BoxGeometry(ROOM_W + 0.6, 0.3, ROOM_D + 0.6),
-      new THREE.MeshLambertMaterial({ color: house.roof }),
-    );
-    ceil.position.y = wallH + 0.15;
-    room.add(ceil);
+    box(room, new THREE.BoxGeometry(ROOM_W + 0.6, 0.3, ROOM_D + 0.6), new THREE.MeshLambertMaterial({ color: house.roof }), 0, wallH + 0.15, 0);
     // Bed, table, lamp and rug — the whole flat in four boxes.
-    const bed = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 0.7, 4.4),
-      new THREE.MeshLambertMaterial({ color: 0xd23b3b }),
-    );
-    bed.position.set(-ROOM_W / 2 + 1.8, 0.65, -1);
-    room.add(bed);
-    const table = new THREE.Mesh(
-      new THREE.BoxGeometry(2.6, 0.25, 1.6),
-      new THREE.MeshLambertMaterial({ color: 0x5a4028 }),
-    );
-    table.position.set(1.6, 1.0, 1.6);
-    room.add(table);
-    const lamp = new THREE.Mesh(
-      new THREE.SphereGeometry(0.5, 10, 8),
-      new THREE.MeshBasicMaterial({ color: 0xffe9a8 }),
-    );
-    lamp.position.set(1.6, 2.6, 1.6);
-    room.add(lamp);
-    const rug = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 0.08, 3),
-      new THREE.MeshLambertMaterial({ color: 0x8a5fc0 }),
-    );
-    rug.position.set(0, 0.34, 0);
-    room.add(rug);
+    box(room, new THREE.BoxGeometry(2.2, 0.7, 4.4), new THREE.MeshLambertMaterial({ color: 0xd23b3b }), -ROOM_W / 2 + 1.8, 0.65, -1);
+    box(room, new THREE.BoxGeometry(2.6, 0.25, 1.6), new THREE.MeshLambertMaterial({ color: 0x5a4028 }), 1.6, 1.0, 1.6);
+    box(room, new THREE.SphereGeometry(0.5, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe9a8 }), 1.6, 2.6, 1.6);
+    box(room, new THREE.BoxGeometry(4, 0.08, 3), new THREE.MeshLambertMaterial({ color: 0x8a5fc0 }), 0, 0.34, 0);
     room.position.set(house.room.x, 0, house.room.z);
     scene.add(room);
     house._room = room;
@@ -246,17 +167,6 @@ export function createHousing(scene) {
     if (data.respawn && typeof data.respawn.x === 'number') housing.respawn = data.respawn;
   }
 
-  housing.doorAt = doorAt;
-  housing.isOwned = isOwned;
-  housing.buy = buy;
-  housing.enter = enter;
-  housing.exit = exit;
-  housing.respawnPoint = respawnPoint;
-  housing.ownedCount = ownedCount;
-  housing.statusText = statusText;
-  housing.promptText = promptText;
-  housing.markers = markers;
-  housing.saveData = saveData;
-  housing.restore = restore;
+  Object.assign(housing, { doorAt, isOwned, buy, enter, exit, respawnPoint, ownedCount, statusText, promptText, markers, saveData, restore });
   return housing;
 }

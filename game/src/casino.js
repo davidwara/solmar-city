@@ -29,24 +29,16 @@ function spinReel() {
   return REELS[0];
 }
 
-function cardName(v) {
-  if (v === 1) return 'A';
-  if (v === 11) return 'J';
-  if (v === 12) return 'Q';
-  if (v === 13) return 'K';
-  return String(v);
-}
+const FACE_CARDS = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' };
+
+function cardName(v) { return FACE_CARDS[v] || String(v); }
 
 export function createCasino(scene, audio) {
   // A gold neon sign over the door so the casino reads at night.
-  const sign = new THREE.Mesh(
-    new THREE.BoxGeometry(7, 1.6, 0.4),
-    new THREE.MeshBasicMaterial({ color: 0xffd23f }),
-  );
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(7, 1.6, 0.4), new THREE.MeshBasicMaterial({ color: 0xffd23f }));
   sign.position.set(CASINO_POS.x, 6.4, CASINO_POS.z - 11);
   scene.add(sign);
-  const doorMat = new THREE.MeshLambertMaterial({ color: 0x8a5fc0 });
-  const door = new THREE.Mesh(new THREE.BoxGeometry(3.4, 4.2, 0.4), doorMat);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(3.4, 4.2, 0.4), new THREE.MeshLambertMaterial({ color: 0x8a5fc0 }));
   door.position.set(CASINO_POS.x, 2.1, CASINO_POS.z - 11);
   scene.add(door);
 
@@ -76,15 +68,17 @@ export function createCasino(scene, audio) {
     casino.spins += 1;
     let delta = -SLOT_BET;
     let text = `${reels.join(' · ')} — no match, ${formatMoney(SLOT_BET)} gone.`;
-    if (reels[0] === 'SEVEN' && reels[1] === 'SEVEN' && reels[2] === 'SEVEN') {
+    // Three SEVENs is the jackpot; any three of a kind pays $250, any pair $75.
+    const win = reels[0] === 'SEVEN' && reels[1] === 'SEVEN' && reels[2] === 'SEVEN' ? SLOT_JACKPOT
+      : reels[0] === reels[1] && reels[1] === reels[2] ? 250
+      : reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2] ? 75 : 0;
+    if (win === SLOT_JACKPOT) {
       delta = SLOT_JACKPOT - SLOT_BET;
       text = `SEVEN · SEVEN · SEVEN — JACKPOT ${formatMoney(SLOT_JACKPOT)}!`;
-    } else if (reels[0] === reels[1] && reels[1] === reels[2]) {
-      delta = 250 - SLOT_BET;
-      text = `${reels[0]} ×3 — three of a kind, +${formatMoney(250)}!`;
-    } else if (reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2]) {
-      delta = 75 - SLOT_BET;
-      text = `${reels.join(' · ')} — a pair, +${formatMoney(75)}.`;
+    } else if (win > 0) {
+      delta = win - SLOT_BET;
+      text = win === 250 ? `${reels[0]} ×3 — three of a kind, +${formatMoney(250)}!`
+        : `${reels.join(' · ')} — a pair, +${formatMoney(75)}.`;
     }
     if (delta > 0) {
       casino.won += delta;
@@ -189,22 +183,10 @@ export function createCasino(scene, audio) {
 
   function restore(data) {
     if (!data) return;
-    if (typeof data.won === 'number') casino.won = data.won;
-    if (typeof data.lost === 'number') casino.lost = data.lost;
-    if (typeof data.biggestWin === 'number') casino.biggestWin = data.biggestWin;
-    if (typeof data.spins === 'number') casino.spins = data.spins;
+    for (const k of ['won', 'lost', 'biggestWin', 'spins']) if (typeof data[k] === 'number') casino[k] = data[k];
     if (typeof data.streak === 'number') casino.streak = Math.max(0, Math.min(2, data.streak));
   }
 
-  casino.nearCasino = nearCasino;
-  casino.slots = slots;
-  casino.startHiLo = startHiLo;
-  casino.guessHiLo = guessHiLo;
-  casino.cashOut = cashOut;
-  casino.statusText = statusText;
-  casino.promptText = promptText;
-  casino.markers = markers;
-  casino.saveData = saveData;
-  casino.restore = restore;
+  Object.assign(casino, { nearCasino, slots, startHiLo, guessHiLo, cashOut, statusText, promptText, markers, saveData, restore });
   return casino;
 }

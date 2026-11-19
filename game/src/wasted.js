@@ -76,11 +76,6 @@ export function createWasted() {
     return parts.join(' · ');
   }
 
-  wasted.hospitalBill = hospitalBill;
-  wasted.billBreakdown = billBreakdown;
-  wasted.showWasted = showWasted;
-  wasted.countBusted = countBusted;
-  wasted.update = update;
-  wasted.statsText = statsText;
+  Object.assign(wasted, { hospitalBill, billBreakdown, showWasted, countBusted, update, statsText });
   return wasted;
 }

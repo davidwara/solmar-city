@@ -18,53 +18,24 @@ export const RACE_ROUTES = [
   {
     name: 'Harbour Sprint',
     prize: 300,
-    gates: [
-      { x: 124, z: 186 },
-      { x: 124, z: -62 },
-      { x: 0, z: -62 },
-      { x: 0, z: 124 },
-      { x: 124, z: 124 },
-      { x: 124, z: 186 },
-    ],
+    gates: [{ x: 124, z: 186 }, { x: 124, z: -62 }, { x: 0, z: -62 }, { x: 0, z: 124 }, { x: 124, z: 124 }, { x: 124, z: 186 }],
   },
   {
     name: 'Beachfront Dash',
     prize: 500,
-    gates: [
-      { x: 124, z: 186 },
-      { x: -124, z: 186 },
-      { x: -124, z: -124 },
-      { x: 62, z: -124 },
-      { x: 62, z: 186 },
-      { x: 124, z: 186 },
-    ],
+    gates: [{ x: 124, z: 186 }, { x: -124, z: 186 }, { x: -124, z: -124 }, { x: 62, z: -124 }, { x: 62, z: 186 }, { x: 124, z: 186 }],
   },
   {
     name: 'Island Loop',
     prize: 800,
-    gates: [
-      { x: 124, z: 186 },
-      { x: 40, z: 186 },
-      { x: 40, z: 320 },
-      { x: 120, z: 380 },
-      { x: -20, z: 380 },
-      { x: 40, z: 320 },
-      { x: 40, z: 186 },
-      { x: 124, z: 186 },
-    ],
+    gates: [{ x: 124, z: 186 }, { x: 40, z: 186 }, { x: 40, z: 320 }, { x: 120, z: 380 },
+      { x: -20, z: 380 }, { x: 40, z: 320 }, { x: 40, z: 186 }, { x: 124, z: 186 }],
   },
   // Phase 7: the Downtown Loop — a tight figure round the towers, $400.
   {
     name: 'Downtown Loop',
     prize: 400,
-    gates: [
-      { x: 124, z: 186 },
-      { x: 124, z: -124 },
-      { x: -62, z: -124 },
-      { x: -62, z: 62 },
-      { x: 62, z: 62 },
-      { x: 124, z: 186 },
-    ],
+    gates: [{ x: 124, z: 186 }, { x: 124, z: -124 }, { x: -62, z: -124 }, { x: -62, z: 62 }, { x: 62, z: 62 }, { x: 124, z: 186 }],
   },
 ];
 
@@ -140,6 +111,11 @@ export function createRaces(scene) {
     spoilerOn: false,
   };
 
+  /** Hide every gate ring (race over or abandoned). */
+  function hideRings() {
+    rings.forEach((g) => { g.ring.visible = false; g.postL.visible = false; g.postR.visible = false; });
+  }
+
   /** True when the car sits at the start flag (any route can begin). */
   function nearStart(pos) {
     return Math.hypot(pos.x - RACE_START.x, pos.z - RACE_START.z) < 12;
@@ -197,11 +173,7 @@ export function createRaces(scene) {
       // Mara left the car mid-race — the run is void.
       races.active = false;
       races.lastResult = 'Race abandoned — you left the car.';
-      rings.forEach((g) => {
-        g.ring.visible = false;
-        g.postL.visible = false;
-        g.postR.visible = false;
-      });
+      hideRings();
       return { abandoned: true };
     }
     if (races.countdown > 0) {
@@ -229,11 +201,7 @@ export function createRaces(scene) {
         races.racesRun += 1;
         races.active = false;
         races.lastResult = `${races.route.name} — ${formatRaceTime(t)}${isBest ? ' · NEW BEST!' : ''} · +${formatMoney(races.route.prize)}`;
-        rings.forEach((g) => {
-          g.ring.visible = false;
-          g.postL.visible = false;
-          g.postR.visible = false;
-        });
+        hideRings();
         return { finished: true, won: true, prize: races.route.prize, best: isBest, time: t };
       }
       return { gate: races.gateIndex };
@@ -280,15 +248,6 @@ export function createRaces(scene) {
     if (data.spoilerOn === true) races.spoilerOn = true;
   }
 
-  races.nearStart = nearStart;
-  races.start = start;
-  races.update = update;
-  races.nextGate = nextGate;
-  races.statusText = statusText;
-  races.promptText = promptText;
-  races.markers = markers;
-  races.saveData = saveData;
-  races.restore = restore;
-  races.formatTime = formatRaceTime;
+  Object.assign(races, { nearStart, start, update, nextGate, statusText, promptText, markers, saveData, restore, formatTime: formatRaceTime });
   return races;
 }

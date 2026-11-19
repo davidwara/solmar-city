@@ -140,9 +140,7 @@ export function createWeather(scene, city, daynight) {
    * fishing bobber drifts on it, and the pier feels it before the city.
    */
   function seaBreeze() {
-    if (weather.mode === 'storm') return 1;
-    if (weather.mode === 'rain') return 0.7;
-    return 0.3;
+    return { storm: 1, rain: 0.7, clear: 0.3 }[weather.mode] ?? 0.3;
   }
 
   function iconText() {
@@ -163,9 +161,7 @@ export function createWeather(scene, city, daynight) {
    * storms, rain follows clear, and only rain ever turns into a storm.
    */
   function forecast() {
-    if (weather.mode === 'clear') return 'rain or clear skies';
-    if (weather.mode === 'rain') return 'a storm, or clearing up';
-    return 'clear skies';
+    return { clear: 'rain or clear skies', rain: 'a storm, or clearing up', storm: 'clear skies' }[weather.mode];
   }
 
   function update(dt, focusPos, audio) {
@@ -237,15 +233,7 @@ export function createWeather(scene, city, daynight) {
     bolt.intensity = weather.flash * 3.2;
   }
 
-  weather.setMode = setMode;
-  weather.flashNow = flashNow;
-  weather.gripFactor = gripFactor;
-  weather.seaBreeze = seaBreeze;
-  weather.iconText = iconText;
-  weather.nextChangeIn = nextChangeIn;
-  weather.forecast = forecast;
-  weather.update = update;
-  weather.updateRainRipples = updateRainRipples;
+  Object.assign(weather, { setMode, flashNow, gripFactor, seaBreeze, iconText, nextChangeIn, forecast, update, updateRainRipples });
   weather.raining = false;
   return weather;
 }

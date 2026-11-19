@@ -32,37 +32,23 @@ export const ARMOR_BONUS = 50; // +50 max health
 
 /** Build the garage: floor pad, striped kerb, sign pole and orange sign. */
 function buildGarage(scene) {
-  const pad = new THREE.Mesh(
-    new THREE.BoxGeometry(18, 0.3, 14),
-    new THREE.MeshLambertMaterial({ color: 0x3a3f45 }),
-  );
-  pad.position.set(GARAGE_POS.x, 0.15, GARAGE_POS.z);
-  scene.add(pad);
+  /** One mesh, positioned and added — the garage builder's shorthand. */
+  const box = (geo, mat, x, y, z) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    scene.add(m);
+    return m;
+  };
+  box(new THREE.BoxGeometry(18, 0.3, 14), new THREE.MeshLambertMaterial({ color: 0x3a3f45 }), GARAGE_POS.x, 0.15, GARAGE_POS.z);
   const kerbMat = new THREE.MeshLambertMaterial({ color: 0xff7a2a });
-  for (const dz of [-7, 7]) {
-    const kerb = new THREE.Mesh(new THREE.BoxGeometry(18, 0.5, 0.8), kerbMat);
-    kerb.position.set(GARAGE_POS.x, 0.4, GARAGE_POS.z + dz);
-    scene.add(kerb);
-  }
-  const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.18, 0.18, 7, 8),
-    new THREE.MeshLambertMaterial({ color: 0x888888 }),
-  );
-  pole.position.set(GARAGE_POS.x - 8, 3.5, GARAGE_POS.z - 6);
-  scene.add(pole);
-  const sign = new THREE.Mesh(
-    new THREE.BoxGeometry(6, 2.2, 0.3),
-    new THREE.MeshLambertMaterial({ color: 0xff7a2a }),
-  );
-  sign.position.set(GARAGE_POS.x - 8, 7.4, GARAGE_POS.z - 6);
-  scene.add(sign);
+  for (const dz of [-7, 7]) box(new THREE.BoxGeometry(18, 0.5, 0.8), kerbMat, GARAGE_POS.x, 0.4, GARAGE_POS.z + dz);
+  box(new THREE.CylinderGeometry(0.18, 0.18, 7, 8), new THREE.MeshLambertMaterial({ color: 0x888888 }), GARAGE_POS.x - 8, 3.5, GARAGE_POS.z - 6);
+  box(new THREE.BoxGeometry(6, 2.2, 0.3), new THREE.MeshLambertMaterial({ color: 0xff7a2a }), GARAGE_POS.x - 8, 7.4, GARAGE_POS.z - 6);
   // A wrench glyph on the sign: two crossed bars, visible from the road.
   const barMat = new THREE.MeshBasicMaterial({ color: 0x1a1206 });
   for (const rot of [0.6, -0.6]) {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 0.1), barMat);
-    bar.position.set(GARAGE_POS.x - 8, 7.4, GARAGE_POS.z - 5.8);
+    const bar = box(new THREE.BoxGeometry(3.4, 0.5, 0.1), barMat, GARAGE_POS.x - 8, 7.4, GARAGE_POS.z - 5.8);
     bar.rotation.z = rot;
-    scene.add(bar);
   }
 }
 

@@ -8,38 +8,34 @@ import { resolveCollisions } from './player.js';
 
 const CAR_COLORS = [0xd23b3b, 0x2e6fd8, 0xf2c14e, 0x3fae6a, 0x8a5fc0, 0xe8e8e8, 0x222831, 0xff7a2a];
 
+/** One mesh, positioned and added to a group — the car builders' shorthand. */
+function box(parent, geo, mat, x, y, z) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
+
 export function buildCarMesh(color) {
   const group = new THREE.Group();
   const paint = new THREE.MeshLambertMaterial({ color });
   const glass = new THREE.MeshLambertMaterial({ color: 0x1c2b36 });
   const tyre = new THREE.MeshLambertMaterial({ color: 0x141414 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.62, 4.3), paint);
-  body.position.y = 0.55;
-  group.add(body);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.55, 2.1), glass);
-  cabin.position.set(0, 1.1, -0.25);
-  group.add(cabin);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.1, 2.0), paint);
-  roof.position.set(0, 1.42, -0.25);
-  group.add(roof);
+  box(group, new THREE.BoxGeometry(1.9, 0.62, 4.3), paint, 0, 0.55, 0);
+  box(group, new THREE.BoxGeometry(1.65, 0.55, 2.1), glass, 0, 1.1, -0.25);
+  box(group, new THREE.BoxGeometry(1.7, 0.1, 2.0), paint, 0, 1.42, -0.25);
   // Headlights + taillights.
   const lightMat = new THREE.MeshBasicMaterial({ color: 0xfff6c8 });
   const tailMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a });
   for (const x of [-0.6, 0.6]) {
-    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.16, 0.08), lightMat);
-    hl.position.set(x, 0.55, 2.16);
-    group.add(hl);
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.16, 0.08), tailMat);
-    tl.position.set(x, 0.55, -2.16);
-    group.add(tl);
+    box(group, new THREE.BoxGeometry(0.35, 0.16, 0.08), lightMat, x, 0.55, 2.16);
+    box(group, new THREE.BoxGeometry(0.35, 0.16, 0.08), tailMat, x, 0.55, -2.16);
   }
   const wheels = [];
   const wheelGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.28, 12);
   for (const [x, z] of [[-0.95, 1.35], [0.95, 1.35], [-0.95, -1.35], [0.95, -1.35]]) {
-    const w = new THREE.Mesh(wheelGeo, tyre);
+    const w = box(group, wheelGeo, tyre, x, 0.36, z);
     w.rotation.z = Math.PI / 2;
-    w.position.set(x, 0.36, z);
-    group.add(w);
     wheels.push(w);
   }
   return { group, wheels };
@@ -70,23 +66,11 @@ export function damageCar(car, n = 1) {
   return car.hp === 0;
 }
 
-/**
- * Phase 7: patch a car back to full health (the garage's work, once Mara
- * pays for it) — a shot-up car that could only limp is roadworthy again.
- */
-export function repairCar(car) {
-  if (!car || typeof car.hp !== 'number') return false;
-  car.hp = 3;
-  return true;
-}
-
 /** Park a row of cars along the roads so the player can steal one. */
 export function spawnParkedCars(scene, rngSeed) {
   const spots = [
-    [0, -40, 0], [62, 30, Math.PI / 2], [-62, -90, -Math.PI / 2],
-    [124, 80, Math.PI], [0, 100, 0], [-124, -30, Math.PI / 2],
-    [62, -150, 0], [-62, 150, Math.PI], [186, -60, -Math.PI / 2],
-    [124, 170, Math.PI],
+    [0, -40, 0], [62, 30, Math.PI / 2], [-62, -90, -Math.PI / 2], [124, 80, Math.PI], [0, 100, 0],
+    [-124, -30, Math.PI / 2], [62, -150, 0], [-62, 150, Math.PI], [186, -60, -Math.PI / 2], [124, 170, Math.PI],
   ];
   const cars = [];
   spots.forEach(([x, z, heading], i) => {
@@ -143,24 +127,9 @@ export function nearestCar(cars, pos, maxDist) {
 /** Red/blue emergency light bar for a police car roof. Returns the two
  *  lamp meshes so police.js can flash them alternately. */
 export function addLightBar(group) {
-  const bar = new THREE.Mesh(
-    new THREE.BoxGeometry(1.1, 0.16, 0.4),
-    new THREE.MeshLambertMaterial({ color: 0x111111 }),
-  );
-  bar.position.set(0, 1.52, -0.25);
-  group.add(bar);
-  const red = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.18, 0.42),
-    new THREE.MeshBasicMaterial({ color: 0xff2222 }),
-  );
-  red.position.set(-0.28, 1.56, -0.25);
-  group.add(red);
-  const blue = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.18, 0.42),
-    new THREE.MeshBasicMaterial({ color: 0x2266ff }),
-  );
-  blue.position.set(0.28, 1.56, -0.25);
-  group.add(blue);
+  box(group, new THREE.BoxGeometry(1.1, 0.16, 0.4), new THREE.MeshLambertMaterial({ color: 0x111111 }), 0, 1.52, -0.25);
+  const red = box(group, new THREE.BoxGeometry(0.5, 0.18, 0.42), new THREE.MeshBasicMaterial({ color: 0xff2222 }), -0.28, 1.56, -0.25);
+  const blue = box(group, new THREE.BoxGeometry(0.5, 0.18, 0.42), new THREE.MeshBasicMaterial({ color: 0x2266ff }), 0.28, 1.56, -0.25);
   return { red, blue };
 }
 
@@ -171,20 +140,9 @@ export function addLightBar(group) {
  */
 export function addSpoiler(group) {
   if (!group || group.userData.spoiler) return false;
-  const blade = new THREE.Mesh(
-    new THREE.BoxGeometry(1.7, 0.1, 0.45),
-    new THREE.MeshLambertMaterial({ color: 0x1c1f24 }),
-  );
-  blade.position.set(0, 1.35, -1.95);
-  group.add(blade);
-  for (const sx of [-0.6, 0.6]) {
-    const strut = new THREE.Mesh(
-      new THREE.BoxGeometry(0.1, 0.35, 0.1),
-      new THREE.MeshLambertMaterial({ color: 0x1c1f24 }),
-    );
-    strut.position.set(sx, 1.15, -1.95);
-    group.add(strut);
-  }
+  const dark = new THREE.MeshLambertMaterial({ color: 0x1c1f24 });
+  box(group, new THREE.BoxGeometry(1.7, 0.1, 0.45), dark, 0, 1.35, -1.95);
+  for (const sx of [-0.6, 0.6]) box(group, new THREE.BoxGeometry(0.1, 0.35, 0.1), dark, sx, 1.15, -1.95);
   group.userData.spoiler = true;
   return true;
 }

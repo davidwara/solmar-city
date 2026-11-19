@@ -19,31 +19,25 @@ export function createPets(scene, audio, collectibles, gangs) {
   const tan = new THREE.MeshLambertMaterial({ color: 0xc89a5a });
   const dark = new THREE.MeshLambertMaterial({ color: 0x5a4028 });
   const dog = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 1.25), tan);
-  body.position.y = 0.62;
-  dog.add(body);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 0.55), tan);
-  head.position.set(0, 0.95, 0.8);
-  dog.add(head);
-  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.35), dark);
-  snout.position.set(0, 0.88, 1.2);
-  dog.add(snout);
-  const earL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.35, 0.2), dark);
-  earL.position.set(-0.24, 1.2, 0.72);
-  dog.add(earL);
+  /** One mesh, positioned and added — the dog builder's shorthand. */
+  const box = (geo, mat, x, y, z) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    dog.add(m);
+    return m;
+  };
+  box(new THREE.BoxGeometry(0.7, 0.55, 1.25), tan, 0, 0.62, 0);
+  box(new THREE.BoxGeometry(0.55, 0.5, 0.55), tan, 0, 0.95, 0.8);
+  box(new THREE.BoxGeometry(0.3, 0.22, 0.35), dark, 0, 0.88, 1.2);
+  const earL = box(new THREE.BoxGeometry(0.14, 0.35, 0.2), dark, -0.24, 1.2, 0.72);
   const earR = earL.clone();
   earR.position.x = 0.24;
   dog.add(earR);
   const legs = [];
   for (const [lx, lz] of [[-0.24, 0.45], [0.24, 0.45], [-0.24, -0.45], [0.24, -0.45]]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.16), dark);
-    leg.position.set(lx, 0.25, lz);
-    dog.add(leg);
-    legs.push(leg);
+    legs.push(box(new THREE.BoxGeometry(0.16, 0.5, 0.16), dark, lx, 0.25, lz));
   }
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.55), tan);
-  tail.position.set(0, 0.85, -0.85);
-  dog.add(tail);
+  const tail = box(new THREE.BoxGeometry(0.12, 0.12, 0.55), tan, 0, 0.85, -0.85);
   dog.position.set(3, 0, -16);
   scene.add(dog);
 
@@ -169,18 +163,9 @@ export function createPets(scene, audio, collectibles, gangs) {
   function restore(data) {
     if (!data) return;
     if (typeof data.happiness === 'number') pets.happiness = Math.max(0, Math.min(100, data.happiness));
-    if (typeof data.snacksGiven === 'number') pets.snacksGiven = data.snacksGiven;
-    if (typeof data.packagesFound === 'number') pets.packagesFound = data.packagesFound;
+    for (const k of ['snacksGiven', 'packagesFound']) if (typeof data[k] === 'number') pets[k] = data[k];
   }
 
-  pets.feed = feed;
-  pets.point = point;
-  pets.update = update;
-  pets.statusText = statusText;
-  pets.promptText = promptText;
-  pets.markers = markers;
-  pets.saveData = saveData;
-  pets.restore = restore;
-  pets.dog = dog;
+  Object.assign(pets, { feed, point, update, statusText, promptText, markers, saveData, restore, dog });
   return pets;
 }

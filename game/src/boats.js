@@ -9,12 +9,7 @@ import * as THREE from 'three';
 import { clamp, wrapAngle } from './utils.js';
 
 // The bay: boats may sail anywhere in this rectangle of open water.
-export const BAY = {
-  minX: -260,
-  maxX: 260,
-  minZ: 258, // the beach line — boats stop here, they never beach themselves
-  maxZ: 470,
-};
+export const BAY = { minX: -260, maxX: 260, minZ: 258, maxZ: 470 }; // minZ is the beach line — boats stop here, they never beach themselves
 
 // Phase 6: the Marina Market stall on the west dock — the third courier
 // depot, where parcels change hands beside the moored boats.
@@ -28,6 +23,14 @@ const MOORINGS = [
   { x: 66, z: 292, heading: 2.6, color: 0x3fae6a, name: 'Tide' },
 ];
 
+/** One mesh, positioned and added — the boat builder's shorthand. */
+function box(parent, geo, mat, x, y, z) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
+
 /** Build one boat: hull, deck, cabin, mast, outboard motor, nav light. */
 function buildBoatMesh(color) {
   const group = new THREE.Group();
@@ -37,45 +40,22 @@ function buildBoatMesh(color) {
   const glassMat = new THREE.MeshLambertMaterial({ color: 0x1c2b36 });
 
   // Hull: a long tapered box, white stripe along the waterline.
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 7.2), hullMat);
-  hull.position.y = 0.55;
-  group.add(hull);
-  const bow = new THREE.Mesh(new THREE.ConeGeometry(1.3, 2.2, 4), hullMat);
+  box(group, new THREE.BoxGeometry(2.6, 0.9, 7.2), hullMat, 0, 0.55, 0);
+  const bow = box(group, new THREE.ConeGeometry(1.3, 2.2, 4), hullMat, 0, 0.55, 4.6);
   bow.rotation.x = Math.PI / 2;
   bow.rotation.y = Math.PI / 4;
-  bow.position.set(0, 0.55, 4.6);
-  group.add(bow);
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.66, 0.22, 7.24), deckMat);
-  stripe.position.y = 0.32;
-  group.add(stripe);
+  box(group, new THREE.BoxGeometry(2.66, 0.22, 7.24), deckMat, 0, 0.32, 0);
 
   // Deck, cabin with windows, and a short mast with a red nav light.
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.18, 6.4), deckMat);
-  deck.position.y = 1.05;
-  group.add(deck);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.9, 2.4), glassMat);
-  cabin.position.set(0, 1.55, -0.6);
-  group.add(cabin);
-  const cabinRoof = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.12, 2.6), hullMat);
-  cabinRoof.position.set(0, 2.05, -0.6);
-  group.add(cabinRoof);
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.6, 8), darkMat);
-  mast.position.set(0, 3.3, -0.6);
-  group.add(mast);
-  const navLight = new THREE.Mesh(
-    new THREE.SphereGeometry(0.16, 10, 8),
-    new THREE.MeshBasicMaterial({ color: 0xff3d3d }),
-  );
-  navLight.position.set(0, 4.65, -0.6);
-  group.add(navLight);
+  box(group, new THREE.BoxGeometry(2.3, 0.18, 6.4), deckMat, 0, 1.05, 0);
+  box(group, new THREE.BoxGeometry(1.9, 0.9, 2.4), glassMat, 0, 1.55, -0.6);
+  box(group, new THREE.BoxGeometry(2.0, 0.12, 2.6), hullMat, 0, 2.05, -0.6);
+  box(group, new THREE.CylinderGeometry(0.06, 0.08, 2.6, 8), darkMat, 0, 3.3, -0.6);
+  const navLight = box(group, new THREE.SphereGeometry(0.16, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff3d3d }), 0, 4.65, -0.6);
 
   // Outboard motor at the stern, plus a bench seat.
-  const motor = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 0.5), darkMat);
-  motor.position.set(0, 0.7, -3.8);
-  group.add(motor);
-  const bench = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.16, 0.6), deckMat);
-  bench.position.set(0, 1.25, 1.4);
-  group.add(bench);
+  box(group, new THREE.BoxGeometry(0.6, 0.9, 0.5), darkMat, 0, 0.7, -3.8);
+  box(group, new THREE.BoxGeometry(1.8, 0.16, 0.6), deckMat, 0, 1.25, 1.4);
   return { group, navLight };
 }
 
@@ -84,13 +64,9 @@ function buildDock(scene, x, z, rotY) {
   const dock = new THREE.Group();
   const wood = new THREE.MeshLambertMaterial({ color: 0x8a6a45 });
   const postMat = new THREE.MeshLambertMaterial({ color: 0x5a4028 });
-  const planks = new THREE.Mesh(new THREE.BoxGeometry(4, 0.35, 26), wood);
-  planks.position.y = 0.55;
-  dock.add(planks);
+  box(dock, new THREE.BoxGeometry(4, 0.35, 26), wood, 0, 0.55, 0);
   for (const [px, pz] of [[-1.8, -12], [1.8, -12], [-1.8, 0], [1.8, 0], [-1.8, 12], [1.8, 12]]) {
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.6, 8), postMat);
-    post.position.set(px, 0.5, pz);
-    dock.add(post);
+    box(dock, new THREE.CylinderGeometry(0.22, 0.22, 1.6, 8), postMat, px, 0.5, pz);
   }
   dock.position.set(x, 0, z);
   dock.rotation.y = rotY;

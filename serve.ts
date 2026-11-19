@@ -2,22 +2,9 @@
 // locally without a build step: `node serve.ts` serves game/ on http://localhost:8080.
 // It sends the MIME types a browser game needs, refuses any path outside game/, and otherwise
 // does nothing clever: this is a development convenience, not a web server for the internet.
-// Phase 2 note: the game is still plain static files — serve.ts needed no
-// functional change, only this comment, because nothing about the new
-// traffic / police / mission / audio / save systems needs the network.
-// Phase 3 note: same story — the pistol, day/night cycle, traffic lights,
-// WASTED respawn and the three new jobs are all client-side modules under
-// game/src/, so this server still does nothing but serve static files.
-// Phase 4 note: same again — weather, collectibles, the radio and the
-// three new jobs are plain static ES modules; no new MIME type needed.
-// Phase 5 note: same again — boats, the island, gangs, the garage and
-// the story cutscenes are plain static ES modules too; the server still
-// does nothing but serve files, and the new systems need no new MIME type.
-// Phase 6 note: same again — fishing, races, safehouses, the casino,
-// courier runs and Biscuit are plain static ES modules too; the server
-// still does nothing but serve files, and the new systems need no new
-// MIME type. The six new modules load through index.html's module graph
-// like every other game/src/ file before them.
+// (The game is plain static files — traffic, police, missions, audio, save, weather, boats,
+// the island, gangs, the garage, story, fishing, races, safehouses, casino, courier runs and
+// Biscuit are all client-side ES modules under game/src/, so the server only serves files.)
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
@@ -30,27 +17,12 @@ const requested = portIndex === -1 ? 8080 : Number(args[portIndex + 1]);
 const port = Number.isInteger(requested) && requested > 0 && requested < 65536 ? requested : 8080;
 
 const MIME: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
-  '.glb': 'model/gltf-binary',
-  '.gltf': 'model/gltf+json',
-  '.bin': 'application/octet-stream',
-  '.wasm': 'application/wasm',
-  '.wav': 'audio/wav',
-  '.mp3': 'audio/mpeg',
-  '.ogg': 'audio/ogg',
-  '.txt': 'text/plain; charset=utf-8',
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.wasm': 'application/wasm',
+  '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.txt': 'text/plain; charset=utf-8',
 };
 
 createServer((request, response) => {

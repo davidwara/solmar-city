@@ -25,29 +25,26 @@ const ATTACK_RANGE = 2.0;
 const ATTACK_DAMAGE = 6;
 const CHASE_RANGE = 26;
 
+/** One mesh, positioned and added — the rival builder's shorthand. */
+function box(parent, geo, mat, x, y, z) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
+
 /** A rival member: a hooded figure in gang colours, fists ready. */
 function buildRivalFigure(color) {
   const group = new THREE.Group();
   const jacket = new THREE.MeshLambertMaterial({ color });
   const skin = new THREE.MeshLambertMaterial({ color: 0x8a5a3b });
   const pants = new THREE.MeshLambertMaterial({ color: 0x222831 });
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.9, 0.42), jacket);
-  torso.position.y = 1.15;
-  group.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 10), skin);
-  head.position.y = 1.88;
-  group.add(head);
-  const hood = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.5, 10), jacket);
-  hood.position.y = 2.08;
-  group.add(hood);
-  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.78, 0.32), pants);
-  legs.position.y = 0.39;
-  group.add(legs);
-  for (const side of [-0.45, 0.45]) {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.8, 0.2), jacket);
-    arm.position.set(side, 1.15, 0);
-    group.add(arm);
-  }
+  box(group, new THREE.BoxGeometry(0.74, 0.9, 0.42), jacket, 0, 1.15, 0);
+  box(group, new THREE.SphereGeometry(0.27, 12, 10), skin, 0, 1.88, 0);
+  box(group, new THREE.ConeGeometry(0.34, 0.5, 10), jacket, 0, 2.08, 0);
+  box(group, new THREE.BoxGeometry(0.52, 0.78, 0.32), pants, 0, 0.39, 0);
+  box(group, new THREE.BoxGeometry(0.2, 0.8, 0.2), jacket, -0.45, 1.15, 0);
+  box(group, new THREE.BoxGeometry(0.2, 0.8, 0.2), jacket, 0.45, 1.15, 0);
   return group;
 }
 
@@ -67,11 +64,7 @@ export function createGangs(scene, seed) {
       const figure = buildRivalFigure(zone.color);
       const a = rand(rng, 0, Math.PI * 2);
       const r = rand(rng, 4, zone.radius - 8);
-      const pos = new THREE.Vector3(
-        zone.center.x + Math.sin(a) * r,
-        0,
-        zone.center.z + Math.cos(a) * r,
-      );
+      const pos = new THREE.Vector3(zone.center.x + Math.sin(a) * r, 0, zone.center.z + Math.cos(a) * r);
       figure.position.copy(pos);
       scene.add(figure);
       members.push({
@@ -147,13 +140,22 @@ export function createGangs(scene, seed) {
     return applyKnockdown(member, 25000);
   }
 
+  /** Standing rivals within maxDist of a point, with their distances. */
+  function rivalsWithin(pos, maxDist) {
+    const out = [];
+    for (const m of members) {
+      if (m.down) continue;
+      const d = Math.hypot(m.pos.x - pos.x, m.pos.z - pos.z);
+      if (d < maxDist) out.push([m, d]);
+    }
+    return out;
+  }
+
   /** Nearest standing rival to a point (for punches and shots). */
   function nearestRival(pos, maxDist) {
     let best = null;
     let bestD = maxDist;
-    for (const m of members) {
-      if (m.down) continue;
-      const d = Math.hypot(m.pos.x - pos.x, m.pos.z - pos.z);
+    for (const [m, d] of rivalsWithin(pos, maxDist)) {
       if (d < bestD) { bestD = d; best = m; }
     }
     return best;
@@ -164,12 +166,7 @@ export function createGangs(scene, seed) {
    * barks at the whole pack, not just the nearest one.
    */
   function rivalsNear(pos, maxDist) {
-    const out = [];
-    for (const m of members) {
-      if (m.down) continue;
-      if (Math.hypot(m.pos.x - pos.x, m.pos.z - pos.z) < maxDist) out.push(m);
-    }
-    return out;
+    return rivalsWithin(pos, maxDist).map(([m]) => m);
   }
 
   /**

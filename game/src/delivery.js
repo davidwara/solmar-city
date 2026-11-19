@@ -40,35 +40,23 @@ const RUSH_BONUS = 15;
 const RUSH_FRACTION = 0.6;
 
 export function createDelivery(scene) {
+  /** One mesh, positioned and added — the depot builder's shorthand. */
+  const box = (geo, mat, x, y, z) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    scene.add(m);
+    return m;
+  };
   // A parcel crate and a painted sign at each depot so they read as
   // workplaces, not empty street corners.
   for (const depot of DEPOTS) {
-    const crate = new THREE.Mesh(
-      new THREE.BoxGeometry(2.4, 2.4, 2.4),
-      new THREE.MeshLambertMaterial({ color: 0xd9a441 }),
-    );
-    crate.position.set(depot.x + 3, 1.2, depot.z);
-    scene.add(crate);
-    const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.12, 4.4, 6),
-      new THREE.MeshLambertMaterial({ color: 0x2e3438 }),
-    );
-    post.position.set(depot.x - 3, 2.2, depot.z);
-    scene.add(post);
-    const sign = new THREE.Mesh(
-      new THREE.BoxGeometry(3.4, 1.1, 0.15),
-      new THREE.MeshLambertMaterial({ color: 0x7fb3c8 }),
-    );
-    sign.position.set(depot.x - 3, 4.6, depot.z);
-    scene.add(sign);
-    depot._crate = crate;
+    depot._crate = box(new THREE.BoxGeometry(2.4, 2.4, 2.4), new THREE.MeshLambertMaterial({ color: 0xd9a441 }), depot.x + 3, 1.2, depot.z);
+    box(new THREE.CylinderGeometry(0.12, 0.12, 4.4, 6), new THREE.MeshLambertMaterial({ color: 0x2e3438 }), depot.x - 3, 2.2, depot.z);
+    box(new THREE.BoxGeometry(3.4, 1.1, 0.15), new THREE.MeshLambertMaterial({ color: 0x7fb3c8 }), depot.x - 3, 4.6, depot.z);
   }
 
   // The drop marker: a floating gold diamond over the doorstep.
-  const dropMarker = new THREE.Mesh(
-    new THREE.OctahedronGeometry(1.6),
-    new THREE.MeshBasicMaterial({ color: 0xffd23f }),
-  );
+  const dropMarker = new THREE.Mesh(new THREE.OctahedronGeometry(1.6), new THREE.MeshBasicMaterial({ color: 0xffd23f }));
   dropMarker.visible = false;
   scene.add(dropMarker);
 
@@ -172,18 +160,9 @@ export function createDelivery(scene) {
 
   function restore(data) {
     if (!data) return;
-    if (typeof data.jobsDone === 'number') delivery.jobsDone = data.jobsDone;
-    if (typeof data.tipsEarned === 'number') delivery.tipsEarned = data.tipsEarned;
-    if (typeof data.jobsFailed === 'number') delivery.jobsFailed = data.jobsFailed;
+    for (const k of ['jobsDone', 'tipsEarned', 'jobsFailed']) if (typeof data[k] === 'number') delivery[k] = data[k];
   }
 
-  delivery.nearDepot = nearDepot;
-  delivery.pickup = pickup;
-  delivery.update = update;
-  delivery.statusText = statusText;
-  delivery.promptText = promptText;
-  delivery.markers = markers;
-  delivery.saveData = saveData;
-  delivery.restore = restore;
+  Object.assign(delivery, { nearDepot, pickup, update, statusText, promptText, markers, saveData, restore });
   return delivery;
 }

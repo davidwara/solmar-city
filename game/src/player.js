@@ -6,7 +6,7 @@
 // scenic spot and snaps it with C, so the on-foot controller is the camera
 // tripod as much as the getaway legs.
 import * as THREE from 'three';
-import { clamp } from './utils.js';
+import { clamp, wrapAngle } from './utils.js';
 import { isOnCauseway } from './city.js';
 
 const WALK_SPEED = 5;
@@ -22,24 +22,21 @@ export function createPlayer(scene) {
   const skin = new THREE.MeshLambertMaterial({ color: 0xd9a986 });
   const hair = new THREE.MeshLambertMaterial({ color: 0x2a1a12 });
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.85, 0.4), jacket);
-  torso.position.y = 1.15;
-  group.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), skin);
-  head.position.y = 1.85;
-  group.add(head);
-  const hairMesh = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
-  hairMesh.position.y = 1.9;
-  group.add(hairMesh);
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.75, 0.3), jeans);
-  legL.position.set(-0.19, 0.38, 0);
-  group.add(legL);
+  /** One mesh, positioned and added — the figure builder's shorthand. */
+  const box = (geo, mat, x, y, z) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    group.add(m);
+    return m;
+  };
+  box(new THREE.BoxGeometry(0.72, 0.85, 0.4), jacket, 0, 1.15, 0);
+  box(new THREE.SphereGeometry(0.26, 12, 10), skin, 0, 1.85, 0);
+  box(new THREE.SphereGeometry(0.27, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), hair, 0, 1.9, 0);
+  const legL = box(new THREE.BoxGeometry(0.26, 0.75, 0.3), jeans, -0.19, 0.38, 0);
   const legR = legL.clone();
   legR.position.x = 0.19;
   group.add(legR);
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.24), jacket);
-  armL.position.set(-0.48, 1.15, 0);
-  group.add(armL);
+  const armL = box(new THREE.BoxGeometry(0.2, 0.7, 0.24), jacket, -0.48, 1.15, 0);
   const armR = armL.clone();
   armR.position.x = 0.48;
   group.add(armR);
@@ -113,12 +110,10 @@ export function updatePlayer(player, dt, input, cameraYaw, colliders, bound) {
   const fwdZ = -Math.cos(cameraYaw);
   const rightX = Math.cos(cameraYaw);
   const rightZ = -Math.sin(cameraYaw);
-  let mx = 0;
-  let mz = 0;
-  if (input.forward) { mx += fwdX; mz += fwdZ; }
-  if (input.back) { mx -= fwdX; mz -= fwdZ; }
-  if (input.left) { mx -= rightX; mz -= rightZ; }
-  if (input.right) { mx += rightX; mz += rightZ; }
+  const f = (input.forward ? 1 : 0) - (input.back ? 1 : 0);
+  const s = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  const mx = f * fwdX + s * rightX;
+  const mz = f * fwdZ + s * rightZ;
   const len = Math.hypot(mx, mz);
   player.moving = len > 0;
   player.running = player.moving && input.run;
@@ -131,16 +126,13 @@ export function updatePlayer(player, dt, input, cameraYaw, colliders, bound) {
     player.stamina = Math.min(100, player.stamina + 8 * dt);
   }
   if (player.moving) {
-    mx /= len;
-    mz /= len;
+    const nx = mx / len;
+    const nz = mz / len;
     const speed = player.running ? RUN_SPEED : WALK_SPEED;
-    player.pos.x += mx * speed * dt;
-    player.pos.z += mz * speed * dt;
-    const targetHeading = Math.atan2(mx, mz);
-    let d = targetHeading - player.heading;
-    while (d > Math.PI) d -= Math.PI * 2;
-    while (d < -Math.PI) d += Math.PI * 2;
-    player.heading += d * Math.min(1, dt * 12);
+    player.pos.x += nx * speed * dt;
+    player.pos.z += nz * speed * dt;
+    const targetHeading = Math.atan2(nx, nz);
+    player.heading += wrapAngle(targetHeading - player.heading) * Math.min(1, dt * 12);
     player.walkPhase += dt * (player.running ? 13 : 9);
   }
   // Jump + gravity.

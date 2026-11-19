@@ -30,27 +30,20 @@ export function createFishing(scene, audio) {
 
   // The pier: planks from the sand out over the water, posts at the end.
   const pier = new THREE.Group();
-  const planks = new THREE.Mesh(new THREE.BoxGeometry(5, 0.35, 30), wood);
-  planks.position.y = 0.6;
-  pier.add(planks);
+  /** One mesh, positioned and added to the pier — the pier builder's shorthand. */
+  const box = (geo, mat, x, y, z) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    pier.add(m);
+    return m;
+  };
+  box(new THREE.BoxGeometry(5, 0.35, 30), wood, 0, 0.6, 0);
   for (const [px, pz] of [[-2.2, -13], [2.2, -13], [-2.2, 13], [2.2, 13]]) {
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 2.2, 8), postMat);
-    post.position.set(px, 0.6, pz);
-    pier.add(post);
+    box(new THREE.CylinderGeometry(0.24, 0.24, 2.2, 8), postMat, px, 0.6, pz);
   }
   // A bait bucket and a hand-painted FISHING sign at the pier root.
-  const bucket = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.55, 0.42, 0.8, 10),
-    new THREE.MeshLambertMaterial({ color: 0x3d7bff }),
-  );
-  bucket.position.set(-2.6, 0.4, -13);
-  pier.add(bucket);
-  const sign = new THREE.Mesh(
-    new THREE.BoxGeometry(4.4, 1.1, 0.2),
-    new THREE.MeshLambertMaterial({ color: 0x2e6fd8 }),
-  );
-  sign.position.set(0, 2.6, -14.6);
-  pier.add(sign);
+  box(new THREE.CylinderGeometry(0.55, 0.42, 0.8, 10), new THREE.MeshLambertMaterial({ color: 0x3d7bff }), -2.6, 0.4, -13);
+  box(new THREE.BoxGeometry(4.4, 1.1, 0.2), new THREE.MeshLambertMaterial({ color: 0x2e6fd8 }), 0, 2.6, -14.6);
   pier.position.set(PIER_POS.x, 0, PIER_POS.z);
   scene.add(pier);
 
@@ -197,32 +190,15 @@ export function createFishing(scene, audio) {
   }
 
   function saveData() {
-    return {
-      fishCaught: fishing.fishCaught,
-      cashEarned: fishing.cashEarned,
-      goldenBites: fishing.goldenBites,
-      bucket: fishing.bucket.slice(),
-    };
+    return { fishCaught: fishing.fishCaught, cashEarned: fishing.cashEarned, goldenBites: fishing.goldenBites, bucket: fishing.bucket.slice() };
   }
 
   function restore(data) {
     if (!data) return;
-    if (typeof data.fishCaught === 'number') fishing.fishCaught = data.fishCaught;
-    if (typeof data.cashEarned === 'number') fishing.cashEarned = data.cashEarned;
-    if (typeof data.goldenBites === 'number') fishing.goldenBites = data.goldenBites;
+    for (const k of ['fishCaught', 'cashEarned', 'goldenBites']) if (typeof data[k] === 'number') fishing[k] = data[k];
     if (Array.isArray(data.bucket)) fishing.bucket = data.bucket.filter((k) => FISH_PRICES[k]);
   }
 
-  fishing.nearPier = nearPier;
-  fishing.cast = cast;
-  fishing.reel = reel;
-  fishing.sell = sell;
-  fishing.update = update;
-  fishing.statusText = statusText;
-  fishing.catchLogText = catchLogText;
-  fishing.promptText = promptText;
-  fishing.markers = markers;
-  fishing.saveData = saveData;
-  fishing.restore = restore;
+  Object.assign(fishing, { nearPier, cast, reel, sell, update, statusText, catchLogText, promptText, markers, saveData, restore });
   return fishing;
 }

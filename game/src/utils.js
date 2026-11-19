@@ -14,83 +14,23 @@ export function createRng(seed) {
 }
 
 /** Random number in [min, max). */
-export function rand(rng, min, max) {
-  return min + rng() * (max - min);
-}
+export function rand(rng, min, max) { return min + rng() * (max - min); }
 
 /** Random integer in [min, max] inclusive. */
-export function randInt(rng, min, max) {
-  return Math.floor(rand(rng, min, max + 1));
-}
+export function randInt(rng, min, max) { return Math.floor(rand(rng, min, max + 1)); }
 
 /** True with probability p (0..1) on the given rng — weather rolls on it. */
-export function chance(rng, p) {
-  return rng() < p;
-}
+export function chance(rng, p) { return rng() < p; }
 
 /** Pick one element of an array. */
-export function pick(rng, arr) {
-  return arr[Math.floor(rng() * arr.length)];
-}
+export function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
 
-/**
- * Phase 7: a shuffled copy of an array (Fisher–Yates on the given rng)
- * — the original is never touched, so a deck or a route order can be
- * dealt out without mutating the source list.
- */
-export function shuffle(rng, arr) {
-  const out = arr.slice();
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    const tmp = out[i];
-    out[i] = out[j];
-    out[j] = tmp;
-  }
-  return out;
-}
-
-/**
- * Phase 7: seconds as "1:23.4" — the same shape the race clock uses,
- * for any timer the HUD or a results line wants to print.
- */
-export function formatDuration(sec) {
-  const t = Math.max(0, sec || 0);
-  const m = Math.floor(t / 60);
-  const s = (t % 60).toFixed(1).padStart(4, '0');
-  return `${m}:${s}`;
-}
-
-export function clamp(v, min, max) {
-  return v < min ? min : v > max ? max : v;
-}
+export function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }
 
 /** Clamp to 0..1 (used for flash / fade intensities). */
-export function clamp01(v) {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
-}
+export function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 
-export function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
-
-/** Shortest-arc interpolation between two angles. */
-export function lerpAngle(a, b, t) {
-  let d = (b - a) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return a + d * t;
-}
-
-/** Wrap an angle to [-PI, PI]. */
-export function wrapAngle(a) {
-  while (a > Math.PI) a -= Math.PI * 2;
-  while (a < -Math.PI) a += Math.PI * 2;
-  return a;
-}
-
-export function dist2D(ax, az, bx, bz) {
-  return Math.hypot(ax - bx, az - bz);
-}
+export function lerp(a, b, t) { return a + (b - a) * t; }
 
 /** Shortest signed angle from a to b, in [-PI, PI]. Used by pursuit AI. */
 export function angleDiff(a, b) {
@@ -100,13 +40,21 @@ export function angleDiff(a, b) {
   return d;
 }
 
+/** Shortest-arc interpolation between two angles. */
+export function lerpAngle(a, b, t) { return a + angleDiff(a, b) * t; }
+
+/** Wrap an angle to [-PI, PI]. */
+export function wrapAngle(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
 /**
  * Phase 6: clamp any angle to [-PI, PI] in one call — Biscuit's heading
  * and the race gates use it so a turn never spins the long way round.
  */
-export function clampAngle(a) {
-  return angleDiff(0, a);
-}
+export function clampAngle(a) { return angleDiff(0, a); }
 
 /**
  * Phase 6: money as "$1,250" everywhere — the HUD, the casino and the

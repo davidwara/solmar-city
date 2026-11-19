@@ -9,8 +9,6 @@ import * as THREE from 'three';
 import { createRng, rand } from './utils.js';
 
 export const PACKAGE_TOTAL = 15;
-export const PACKAGE_REWARD = 100;
-export const PACKAGE_BONUS = 1000;
 export const PACKAGE_RADIUS = 3.5;
 export const PACKAGE_REVEAL = 60;
 
@@ -51,16 +49,11 @@ export function createCollectibles(scene, seed) {
   const rng = createRng(seed * 7919 + 7);
   const items = SPOTS.map(([x, z], i) => {
     const group = new THREE.Group();
-    const gem = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.9),
-      new THREE.MeshBasicMaterial({ color: 0x7df9ff }),
-    );
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.9), new THREE.MeshBasicMaterial({ color: 0x7df9ff }));
     gem.position.y = 1.6;
     group.add(gem);
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(1.4, 0.08, 8, 24),
-      new THREE.MeshBasicMaterial({ color: 0x7df9ff, transparent: true, opacity: 0.6 }),
-    );
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.08, 8, 24),
+      new THREE.MeshBasicMaterial({ color: 0x7df9ff, transparent: true, opacity: 0.6 }));
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.35;
     group.add(ring);
@@ -173,12 +166,6 @@ export function createCollectibles(scene, seed) {
     return events;
   }
 
-  collectibles.counterText = counterText;
-  collectibles.nearby = nearby;
-  collectibles.nearestPackage = nearestPackage;
-  collectibles.nearestDirection = nearestDirection;
-  collectibles.stageOne = stageOne;
-  collectibles.restore = restore;
-  collectibles.update = update;
+  Object.assign(collectibles, { counterText, nearby, nearestPackage, nearestDirection, stageOne, restore, update });
   return collectibles;
 }
