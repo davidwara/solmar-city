@@ -90,7 +90,7 @@ export function createPolice(scene, seed) {
   }
 
   function addHeat(n, playerPos) {
-    if (n <= 0) return;
+    if (!Number.isFinite(n) || n <= 0) return;
     police.wanted = clamp(police.wanted + n, 0, MAX_WANTED);
     police.unseenTimer = 0;
     ensureFleet(police.wanted, playerPos);

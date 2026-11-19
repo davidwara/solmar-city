@@ -314,7 +314,7 @@ export function createHud() {
     el['toast'].textContent = text;
     el['toast'].style.display = 'block';
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el['toast'].style.display = 'none'; }, ms);
+    toastTimer = setTimeout(() => { el['toast'].style.display = 'none'; }, Math.max(100, ms));
   }
 
   /** The white camera flash for the Shutterbug job (140 ms). */

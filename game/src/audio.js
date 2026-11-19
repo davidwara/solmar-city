@@ -270,6 +270,7 @@ export function createAudio() {
    */
   function update(dt, s = {}) {
     if (!audio.ctx || audio.muted) return;
+    dt = Math.max(0, dt); // a negative frame step must never rewind the step or radio timers
     const t = audio.ctx.currentTime;
     const inCar = !!s.inCar;
     const speed = s.speed || 0;

@@ -244,7 +244,7 @@ export function createMissions(scene) {
 
   /** Start (or jump to) job i. Returns the job, or null when all are done. */
   function startMission(i) {
-    const at = clamp(i, 0, MISSIONS.length);
+    const at = Number.isFinite(i) ? clamp(i, 0, MISSIONS.length) : 0;
     missions.index = at;
     missions.completed = at;
     missions.timer = 0;

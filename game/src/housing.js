@@ -164,7 +164,7 @@ export function createHousing(scene) {
         if (isOwned(house) && house._board) house._board.visible = false;
       }
     }
-    if (data.respawn && typeof data.respawn.x === 'number') housing.respawn = data.respawn;
+    if (data.respawn && typeof data.respawn.x === 'number' && typeof data.respawn.z === 'number') housing.respawn = data.respawn;
   }
 
   Object.assign(housing, { doorAt, isOwned, buy, enter, exit, respawnPoint, ownedCount, statusText, promptText, markers, saveData, restore });

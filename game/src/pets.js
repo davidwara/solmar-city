@@ -81,9 +81,9 @@ export function createPets(scene, audio, collectibles, gangs) {
   }
 
   function update(dt, playerPos, playerMoving) {
-    pets.barkCooldown = Math.max(0, pets.barkCooldown - dt);
+    pets.barkCooldown = Math.max(0, pets.barkCooldown - Math.max(0, dt));
     // Happiness fades: one point a minute, so the snacks never stop.
-    pets.happiness = Math.max(0, pets.happiness - dt / 60);
+    pets.happiness = Math.max(0, pets.happiness - Math.max(0, dt) / 60);
     const followDist = FOLLOW_CLOSE + (FOLLOW_FAR - FOLLOW_CLOSE) * (1 - pets.happiness / 100);
 
     // Gang members too close get a bark — Biscuit does not like them.

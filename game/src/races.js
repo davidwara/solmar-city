@@ -242,7 +242,9 @@ export function createRaces(scene) {
 
   function restore(data) {
     if (!data) return;
-    if (data.best && typeof data.best === 'object') races.best = { ...data.best };
+    if (data.best && typeof data.best === 'object') {
+      races.best = Object.fromEntries(Object.entries(data.best).filter(([, v]) => typeof v === 'number' && v > 0));
+    }
     if (typeof data.wins === 'number') races.wins = data.wins;
     if (typeof data.racesRun === 'number') races.racesRun = data.racesRun;
     if (data.spoilerOn === true) races.spoilerOn = true;

@@ -144,7 +144,7 @@ export function createWeather(scene, city, daynight) {
   }
 
   function iconText() {
-    return WEATHER_ICON[weather.mode];
+    return WEATHER_ICON[weather.mode] ?? '☀ CLEAR';
   }
 
   /**

@@ -120,10 +120,10 @@ export function updatePlayer(player, dt, input, cameraYaw, colliders, bound) {
   // Phase 7: stamina — a sprint costs 12 a second, a walk or a stand
   // gives back 8; at zero Mara drops to a walk whether Shift is held.
   if (player.running) {
-    player.stamina = Math.max(0, player.stamina - 12 * dt);
+    player.stamina = Math.max(0, player.stamina - 12 * Math.max(0, dt));
     if (player.stamina <= 0) player.running = false;
   } else {
-    player.stamina = Math.min(100, player.stamina + 8 * dt);
+    player.stamina = Math.min(100, player.stamina + 8 * Math.max(0, dt));
   }
   if (player.moving) {
     const nx = mx / len;

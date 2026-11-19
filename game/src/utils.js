@@ -23,7 +23,10 @@ export function randInt(rng, min, max) { return Math.floor(rand(rng, min, max + 
 export function chance(rng, p) { return rng() < p; }
 
 /** Pick one element of an array. */
-export function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
+export function pick(rng, arr) {
+  if (!arr || arr.length === 0) return undefined;
+  return arr[Math.floor(rng() * arr.length)];
+}
 
 export function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }
 

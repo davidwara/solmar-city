@@ -68,7 +68,9 @@ createServer((request, response) => {
     response.end();
     return;
   }
-  createReadStream(file).pipe(response);
+  createReadStream(file).on('error', () => {
+    if (!response.writableEnded) response.writeHead(500).end('read error');
+  }).pipe(response);
 }).listen(port, '127.0.0.1', () => {
   console.log(`game/ is on http://localhost:${port}`);
 });

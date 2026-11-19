@@ -118,7 +118,9 @@ export function createCasino(scene, audio) {
     const round = casino.hiLo;
     if (!round) return { ok: false, delta: 0, text: 'No card round live — C to sit down first.', done: true };
     let next = 1 + Math.floor(Math.random() * 13);
-    while (next === round.card) next = 1 + Math.floor(Math.random() * 13);
+    let tries = 0;
+    while (next === round.card && tries++ < 20) next = 1 + Math.floor(Math.random() * 13);
+    if (next === round.card) next = (round.card % 13) + 1; // never a tie, even on a cold streak
     const right = higher ? next > round.card : next < round.card;
     const shown = `${cardName(round.card)} → ${cardName(next)}`;
     if (!right) {

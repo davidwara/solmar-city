@@ -115,8 +115,9 @@ export function updateCar(car, dt, input, colliders, bound, grip = 1) {
 
 /** Nearest car within reach of the player, or null. */
 export function nearestCar(cars, pos, maxDist) {
+  if (!cars || cars.length === 0) return null;
   let best = null;
-  let bestD = maxDist;
+  let bestD = Math.max(0, maxDist);
   for (const car of cars) {
     const d = Math.hypot(car.pos.x - pos.x, car.pos.z - pos.z);
     if (d < bestD) { bestD = d; best = car; }

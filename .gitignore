@@ -14,3 +14,6 @@ shot-p6/
 out/
 # Phase 8: headless screenshot staging profile (one shared dir, wiped per pose).
 shot-p8/
+# Phase 8h: node_modules never belongs in the entry — the game has no
+# dependencies, so a stray `npm install` must not pollute the repo.
+node_modules/

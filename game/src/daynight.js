@@ -28,6 +28,7 @@ const KEYS = [
 ];
 
 function sampleKeys(hours) {
+  if (!Number.isFinite(hours)) hours = 10;
   const h = ((hours % 24) + 24) % 24;
   let a = KEYS[0];
   let b = KEYS[KEYS.length - 1];

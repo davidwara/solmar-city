@@ -148,8 +148,9 @@ export function createBoats(scene) {
 
   /** Nearest boat within reach of a position, or null. */
   function nearest(pos, maxDist) {
+    if (!pos) return null;
     let best = null;
-    let bestD = maxDist;
+    let bestD = Math.max(0, maxDist);
     for (const boat of boats) {
       const d = Math.hypot(boat.pos.x - pos.x, boat.pos.z - pos.z);
       if (d < bestD) { bestD = d; best = boat; }

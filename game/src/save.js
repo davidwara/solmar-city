@@ -40,7 +40,7 @@ function normalizeSave(data) {
     // Phase 4: hidden packages found and Shutterbug photos snapped.
     packagesCollected: n(data.packagesCollected, 0), photosTaken: n(data.photosTaken, 0),
     // Phase 5: gang turf owned, garage paint/engine/armour.
-    turfOwned: Array.isArray(data.turfOwned) ? data.turfOwned : [],
+    turfOwned: Array.isArray(data.turfOwned) ? data.turfOwned.filter((t) => typeof t === 'string') : [],
     paintIndex: n(data.paintIndex, -1), engineLevel: n(data.engineLevel, 0), armor: data.armor === true,
     // Phase 6: fishing, races, safehouses, casino, courier, Biscuit.
     fishing: o(data.fishing), races: o(data.races), housing: o(data.housing),

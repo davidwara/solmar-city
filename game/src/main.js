@@ -928,7 +928,7 @@ if (isShot) {
       const stats = [];
       if (savedGame.timesWasted > 0) stats.push(`WASTED ×${savedGame.timesWasted}`);
       if (savedGame.timesBusted > 0) stats.push(`BUSTED ×${savedGame.timesBusted}`);
-      note.textContent = `Saved progress: ${formatMoney(savedGame.money)} · ${savedGame.missionsCompleted}/9 jobs done`
+      note.textContent = `Saved progress: ${formatMoney(savedGame.money)} · ${savedGame.missionsCompleted}/12 jobs done`
         + (stats.length > 0 ? ` · ${stats.join(' · ')}` : '');
       note.style.display = 'block';
     }

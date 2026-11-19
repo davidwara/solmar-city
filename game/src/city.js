@@ -283,6 +283,7 @@ export function buildCity(scene, seed) {
  * and fog warm up, the sun arcs down toward the sea and dims.
  */
 export function setTimeOfDay(scene, city, t) {
+  t = Math.max(0, Math.min(1, t)); // the sunset blend only means something in 0..1
   const skyDay = new THREE.Color(0x87bfe8);
   const skyDusk = new THREE.Color(0xff9a52);
   const fogDay = new THREE.Color(0x9fc6e8);

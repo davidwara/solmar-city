@@ -86,7 +86,8 @@ export function createDelivery(scene) {
     if (!depot) return null;
     let drop = DROPS[Math.floor(Math.random() * DROPS.length)];
     // Never deliver back to the depot she just left.
-    while (Math.hypot(drop.x - depot.x, drop.z - depot.z) < 40) {
+    let tries = 0;
+    while (Math.hypot(drop.x - depot.x, drop.z - depot.z) < 40 && tries++ < 20) {
       drop = DROPS[Math.floor(Math.random() * DROPS.length)];
     }
     const dist = Math.hypot(drop.x - depot.x, drop.z - depot.z);

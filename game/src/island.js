@@ -191,6 +191,7 @@ export function buildIsland(scene, seed) {
    *  beam's brightness follows the hour (daynight.js): full at night,
    *  fading in at dusk and out at dawn, dark by day. */
   function update(dt, hours) {
+    dt = Math.max(0, dt); // a negative frame step must never rewind the gulls or the beam
     const beam = lighthouseBeamIntensity(hours);
     // The gulls circle the tower, each on its own ring and height.
     for (const g of gulls) {

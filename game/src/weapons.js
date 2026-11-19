@@ -258,8 +258,8 @@ export function createWeapons(scene) {
   /** Mark the pistol owned with the given ammo (screenshot poses). */
   function stageOwned(mag = MAG_SIZE, reserve = 36) {
     weapons.owned = true;
-    weapons.mag = mag;
-    weapons.reserve = reserve;
+    weapons.mag = Math.max(0, Math.min(MAG_SIZE, mag));
+    weapons.reserve = Math.max(0, reserve);
   }
 
   function update(dt) {

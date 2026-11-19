@@ -128,6 +128,7 @@ export function createFishing(scene, audio) {
   }
 
   function update(dt, opts = {}) {
+    dt = Math.max(0, dt); // a negative frame step must never rewind the bite clock
     fishing._goldenHour = opts.goldenHour === true;
     if (fishing.state === 'idle') return;
     fishing.bobPhase += dt;

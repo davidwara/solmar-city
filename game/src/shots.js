@@ -35,7 +35,7 @@ export function stageShot(name, ctx) {
   const driveCar = (x, z, heading, speed) => {
     car.pos.set(x, 0, z);
     car.heading = heading;
-    car.speed = speed;
+    car.speed = Math.max(0, speed);
     car.driven = true;
     ctx.enterCar(car);
   };

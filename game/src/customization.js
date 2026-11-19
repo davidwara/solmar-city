@@ -149,6 +149,7 @@ export function createCustomization(scene, hooks) {
     const kind = btn.dataset.kind;
     if (kind === 'paint') {
       const i = Number(btn.dataset.i);
+      if (!Number.isInteger(i) || !PAINTS[i]) return;
       if (hooks.spend(PAINT_PRICE)) {
         state.paintIndex = i;
         if (hooks.onBought) hooks.onBought(`Paint: ${PAINTS[i].name} — $200. Fresh coat, Mara.`);

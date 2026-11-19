@@ -129,7 +129,7 @@ export function createCollectibles(scene, seed) {
 
   /** Restore a saved count (loaded games keep the packages Mara found). */
   function restore(n) {
-    const kept = Math.max(0, Math.min(PACKAGE_TOTAL, n || 0));
+    const kept = Number.isFinite(n) ? Math.max(0, Math.min(PACKAGE_TOTAL, Math.floor(n))) : 0;
     for (let i = 0; i < kept; i++) {
       items[i].taken = true;
       items[i].group.visible = false;

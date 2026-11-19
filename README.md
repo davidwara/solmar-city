@@ -6,7 +6,7 @@
 
 An open-world crime game for [make.fun's gta6-01](https://make.fun/bounty/gta6-01)
 bounty ("Make GTA 6"). Plain static files, no build step, no network: open
-`game/index.html` in a desktop browser and play.
+`game/index.html` in a desktop browser — or run `node serve.ts` — and play.
 
 ## The game
 

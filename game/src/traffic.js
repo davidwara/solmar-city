@@ -274,6 +274,7 @@ export function spawnTraffic(scene, seed, count = 10) {
 
   /** Stage one car at an exact spot (screenshot poses). */
   function place(i, x, z, axis, dir, speed = 10) {
+    if (cars.length === 0) return null;
     const w = cars[i % cars.length];
     w.axis = axis;
     w.dir = dir;

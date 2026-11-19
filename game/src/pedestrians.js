@@ -331,6 +331,7 @@ export function spawnPedestrians(scene, seed, count = 26) {
 
   /** Stage one ped at an exact spot (screenshot poses). */
   function place(i, x, z) {
+    if (peds.length === 0) return null;
     const p = peds[i % peds.length];
     p.pos.set(x, 0, z);
     p.target.set(x + 8, 0, z + 4);

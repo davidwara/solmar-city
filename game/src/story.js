@@ -65,7 +65,7 @@ export function createStory() {
     const line = story.lines[story.index];
     if (!line) return;
     if (story.shown < line.line.length) {
-      story.typeTimer += dt;
+      story.typeTimer += Math.max(0, dt);
       const chars = Math.floor(story.typeTimer * 55);
       story.shown = Math.min(line.line.length, chars);
       if (textEl) textEl.textContent = line.line.slice(0, story.shown);

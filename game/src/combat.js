@@ -45,6 +45,7 @@ export function createCombat() {
    */
   function tryPunch(player, peds, reach = PUNCH_RANGE) {
     if (combat.cooldown > 0) return null;
+    const swing = Math.max(0.5, reach || PUNCH_RANGE);
     // Phase 7: a combo — landed punches inside the window swing faster,
     // down to a 0.25s floor; a miss breaks the streak.
     combat.cooldown = Math.max(0.25, PUNCH_COOLDOWN - combat.combo * 0.05);
@@ -56,7 +57,7 @@ export function createCombat() {
       const dx = p.pos.x - player.pos.x;
       const dz = p.pos.z - player.pos.z;
       const d = Math.hypot(dx, dz);
-      if (d > reach) continue;
+      if (d > swing) continue;
       // Must be in front of Mara (dot product with facing direction).
       if ((dx * fx + dz * fz) / Math.max(d, 0.001) < 0.35) continue;
       peds.knockDown(p);

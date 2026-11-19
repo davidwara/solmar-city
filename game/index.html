@@ -183,11 +183,12 @@
 <script>
   // The HUD only shows once the game leaves the start screen.
   const hud = document.getElementById('hud');
+  const startScreen = document.getElementById('start-screen');
   const observer = new MutationObserver(() => {
-    hud.classList.toggle('on', document.getElementById('start-screen').style.display === 'none');
+    hud.classList.toggle('on', startScreen.style.display === 'none');
   });
-  observer.observe(document.getElementById('start-screen'), { attributes: true, attributeFilter: ['style'] });
-  hud.classList.toggle('on', document.getElementById('start-screen').style.display === 'none');
+  observer.observe(startScreen, { attributes: true, attributeFilter: ['style'] });
+  hud.classList.toggle('on', startScreen.style.display === 'none');
 </script>
 </body>
 </html>

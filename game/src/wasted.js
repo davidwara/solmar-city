@@ -57,7 +57,7 @@ export function createWasted() {
   /** Advance the overlay timer; fires the respawn callback when it ends. */
   function update(dt) {
     if (!wasted.active) return;
-    wasted.overlayTimer -= dt;
+    wasted.overlayTimer -= Math.max(0, dt);
     if (wasted.overlayTimer <= 0) {
       wasted.active = false;
       const el = document.getElementById('wasted-screen');

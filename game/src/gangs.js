@@ -229,8 +229,10 @@ export function createGangs(scene, seed) {
         const dx = playerPos.x - m.pos.x;
         const dz = playerPos.z - m.pos.z;
         const step = Math.min(d, 3.4 * dt);
-        m.pos.x += (dx / d) * step;
-        m.pos.z += (dz / d) * step;
+        if (d > 0.001) {
+          m.pos.x += (dx / d) * step;
+          m.pos.z += (dz / d) * step;
+        }
         m.figure.rotation.y = Math.atan2(dx, dz);
         m.figure.position.copy(m.pos);
         if (d < ATTACK_RANGE && m.cooldown <= 0) {
