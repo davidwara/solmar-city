@@ -1,81 +1,55 @@
-// Missions: Mara's twelve story jobs for the Solmar underworld.
-// Jobs 1-3 are drive-to-the-marker runs. Job 4 is a timed night run with
-// the law already on her, job 5 is a bodyguard walk (keep the client close
-// and alive), job 6 is a taxi shift: three fares against the clock.
-// Phase 4 adds three more: job 7 is a two-stage smuggler's run (pick up
-// at the marina, then deliver downtown past police roadblocks), job 8 is
-// a getaway (survive three stars for 100 seconds), job 9 is a shutterbug
-// tour (photograph three scenic spots with the C key).
-// Phase 5 adds the last three: job 10 is a boat delivery across the bay
-// to the second island, job 11 is a night run to light the lighthouse,
-// job 12 is a turf war — clear the Sharks out of their own turf.
-// Finishing all twelve opens free roam with the whole city as Mara's
-// playground. The marker is a floating golden beacon + a light pillar,
-// and the same position feeds the HUD objective line and the minimap
-// diamond.
+// Mara's twelve story jobs — the campaign spine of Solmar City.
+// Each job is a small contract: go somewhere (or do something) and get
+// paid. The module owns the golden beacon, the bodyguard client and the
+// smuggler roadblocks, and reports frame-by-frame events to the main
+// loop so the HUD, the money and the wanted level stay in sync.
 import * as THREE from 'three';
 import { CITY } from './city.js';
 import { clamp } from './utils.js';
 
+const BEACON_GOLD = 0xffc93c;
+const VIP_JACKET = 0xd4af37;
+const VIP_SKIN = 0xd9a986;
+const VIP_TROUSERS = 0x222831;
+const BLOCK_ORANGE = 0xff7a2a;
+const BLOCK_WHITE = 0xf2f2f2;
+
+const SPOT_NAMES = ['the beachfront', 'downtown plaza', 'the marina'];
+
+// The twelve jobs, in campaign order. `time` is a limit in seconds
+// (0 = no clock); `target` is always a flat point on the map (y = 0).
 export const MISSIONS = [
   {
-    id: 'first-job',
-    title: 'First Job',
-    kind: 'drive',
+    id: 'first-job', title: 'First Job', kind: 'drive',
     briefing: 'Rico left a package at the marina pier. Go get it.',
-    target: new THREE.Vector3(-150, 0, 225),
-    radius: 9,
-    reward: 250,
-    timeLimit: 0,
+    target: new THREE.Vector3(-150, 0, 225), radius: 9, reward: 250, time: 0,
   },
   {
-    id: 'hot-delivery',
-    title: 'Hot Delivery',
-    kind: 'drive',
+    id: 'hot-delivery', title: 'Hot Delivery', kind: 'drive',
     briefing: 'The package is marked — the law is on you. Deliver it to the downtown drop, fast.',
-    target: new THREE.Vector3(62, 0, -62),
-    radius: 9,
-    reward: 500,
-    timeLimit: 0,
+    target: new THREE.Vector3(62, 0, -62), radius: 9, reward: 500, time: 0,
     heatOnStart: 2,
   },
   {
-    id: 'the-getaway',
-    title: 'The Getaway',
-    kind: 'drive',
+    id: 'the-getaway', title: 'The Getaway', kind: 'drive',
     briefing: 'One last run: reach the beachfront safehouse before the clock runs out.',
-    target: new THREE.Vector3(124, 0, 200),
-    radius: 9,
-    reward: 750,
-    timeLimit: 90,
+    target: new THREE.Vector3(124, 0, 200), radius: 9, reward: 750, time: 90,
   },
   {
-    id: 'night-run',
-    title: 'Night Run',
-    kind: 'drive',
+    id: 'night-run', title: 'Night Run', kind: 'drive',
     briefing: 'A midnight pickup on the north edge — the streets are dark and the law is out. 2 minutes.',
-    target: new THREE.Vector3(-186, 0, 124),
-    radius: 9,
-    reward: 900,
-    timeLimit: 120,
-    heatOnStart: 1,
-    night: true,
+    target: new THREE.Vector3(-186, 0, 124), radius: 9, reward: 900, time: 120,
+    heatOnStart: 1, night: true,
   },
   {
-    id: 'bodyguard',
-    title: 'Bodyguard',
-    kind: 'bodyguard',
-    briefing: 'Walk Rico\u2019s client across downtown. Stay close — he only moves when you are near.',
+    id: 'bodyguard', title: 'Bodyguard', kind: 'bodyguard',
+    briefing: 'Walk Rico’s client across downtown. Stay close — he only moves when you are near.',
     target: new THREE.Vector3(62, 0, 62),
-    vipStart: new THREE.Vector3(-62, 0, 62),
-    radius: 6,
-    reward: 1000,
-    timeLimit: 150,
+    clientStart: new THREE.Vector3(-62, 0, 62),
+    radius: 6, reward: 1000, time: 150,
   },
   {
-    id: 'taxi-king',
-    title: 'Taxi King',
-    kind: 'taxi',
+    id: 'taxi-king', title: 'Taxi King', kind: 'taxi',
     briefing: 'Three fares, one shift. Pick up each rider before their patience runs out.',
     target: new THREE.Vector3(0, 0, 124),
     fares: [
@@ -83,565 +57,502 @@ export const MISSIONS = [
       new THREE.Vector3(-124, 0, -62),
       new THREE.Vector3(124, 0, 200),
     ],
-    fareTime: 60,
-    fareReward: 150,
-    radius: 9,
-    reward: 400,
-    timeLimit: 0,
+    fareTime: 60, fareReward: 150, radius: 9, reward: 400, time: 0,
   },
   {
-    id: 'smugglers-run',
-    title: "Smuggler's Run",
-    kind: 'smuggler',
+    id: 'smugglers-run', title: 'Smuggler\'s Run', kind: 'smuggler',
     briefing: 'Grab the crate at the marina pier, then run it to the east docks — roadblocks go up the moment you lift it.',
     pickup: new THREE.Vector3(-150, 0, 225),
-    target: new THREE.Vector3(186, 0, -62),
-    radius: 9,
-    reward: 1200,
-    timeLimit: 150,
+    target: new THREE.Vector3(186, 0, -62), radius: 9, reward: 1200, time: 150,
     heatOnPickup: 1,
   },
   {
-    id: 'getaway-driver',
-    title: 'Getaway Driver',
-    kind: 'getaway',
+    id: 'getaway-driver', title: 'Getaway Driver', kind: 'getaway',
     briefing: 'Three stars, the whole city behind you — stay free for 100 seconds and the heat dies.',
-    target: new THREE.Vector3(0, 0, 0),
-    radius: 0,
-    reward: 1500,
-    timeLimit: 100,
+    target: new THREE.Vector3(0, 0, 0), radius: 0, reward: 1500, time: 100,
     heatOnStart: 3,
   },
   {
-    id: 'shutterbug',
-    title: 'Shutterbug',
-    kind: 'shutterbug',
+    id: 'shutterbug', title: 'Shutterbug', kind: 'shutterbug',
     briefing: 'Three scenic spots — beach, downtown, marina. Get close and snap each one with C. $300 a photo, $500 bonus for the set.',
+    target: new THREE.Vector3(0, 0, 215),
     spots: [
       new THREE.Vector3(0, 0, 215),
       new THREE.Vector3(62, 0, -62),
       new THREE.Vector3(-150, 0, 225),
     ],
-    photoReward: 300,
-    radius: 15,
-    reward: 500,
-    timeLimit: 0,
+    photoReward: 300, radius: 15, reward: 500, time: 0,
   },
   {
-    id: 'island-hopper',
-    title: 'Island Hopper',
-    kind: 'boat',
+    id: 'island-hopper', title: 'Island Hopper', kind: 'boat',
     briefing: 'Take a boat from the marina and run the drop across the bay to the island jetty — the delivery only counts if you arrive by boat.',
-    target: new THREE.Vector3(40, 0, 312),
-    radius: 12,
-    reward: 1400,
-    timeLimit: 240,
+    target: new THREE.Vector3(40, 0, 312), radius: 12, reward: 1400, time: 240,
   },
   {
-    id: 'lighthouse-keeper',
-    title: 'Lighthouse Keeper',
-    kind: 'lighthouse',
+    id: 'lighthouse-keeper', title: 'Lighthouse Keeper', kind: 'lighthouse',
     briefing: 'After dark, climb to the island lighthouse and light it — the beam guides the smugglers home. Reach the tower after 21:00.',
-    target: new THREE.Vector3(120, 0, 398),
-    radius: 10,
-    reward: 1600,
-    timeLimit: 300,
+    target: new THREE.Vector3(120, 0, 398), radius: 10, reward: 1600, time: 300,
     night: true,
   },
   {
-    id: 'turf-war',
-    title: 'Turf War',
-    kind: 'turf',
+    id: 'turf-war', title: 'Turf War', kind: 'turf',
     briefing: 'The Sharks jumped one of ours. Clear every Shark out of their turf on the north streets — get in close and lay them out with your fists.',
-    target: new THREE.Vector3(-62, 0, -124),
-    radius: 34,
-    reward: 1800,
-    timeLimit: 0,
+    target: new THREE.Vector3(-62, 0, -124), radius: 34, reward: 1800, time: 0,
     gang: 'sharks',
   },
 ];
 
-/** Create the mission system. Returns the tracker + marker + update. */
+const VIP_FOLLOW_RANGE = 18; // Mara must stay this close or the client freezes
+const VIP_WALK_SPEED = 2.4; // metres per second toward the safe point
+
 export function createMissions(scene) {
-  // Marker: a floating octahedron over a light pillar, visible from afar.
-  const marker = new THREE.Group();
+  // ---- visuals: the golden beacon -------------------------------------
+  const beacon = new THREE.Group();
   const gem = new THREE.Mesh(
-    new THREE.OctahedronGeometry(2.1),
-    new THREE.MeshBasicMaterial({ color: 0xffd23f }),
+    new THREE.OctahedronGeometry(1.05),
+    new THREE.MeshBasicMaterial({ color: BEACON_GOLD }),
   );
   gem.position.y = 6;
-  marker.add(gem);
-  const beam = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.5, 1.2, 26, 10, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.28, side: THREE.DoubleSide }),
+  beacon.add(gem);
+  const pillar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.5, 1.2, 26, 12, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: BEACON_GOLD, transparent: true, opacity: 0.28,
+      side: THREE.DoubleSide, depthWrite: false,
+    }),
   );
-  beam.position.y = 13;
-  marker.add(beam);
-  scene.add(marker);
+  pillar.position.y = 13;
+  beacon.add(pillar);
+  scene.add(beacon);
 
-  // The Bodyguard client: a gold-jacketed figure who walks only while Mara
-  // stays close. Hidden until job 5 starts.
+  // ---- visuals: Rico's client (the bodyguard VIP) --------------------
   const vip = new THREE.Group();
-  const vipJacket = new THREE.MeshLambertMaterial({ color: 0xffd23f });
-  const vipTorso = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.85, 0.4), vipJacket);
+  const vipTorso = new THREE.Mesh(
+    new THREE.BoxGeometry(0.72, 0.85, 0.4),
+    new THREE.MeshLambertMaterial({ color: VIP_JACKET }),
+  );
   vipTorso.position.y = 1.15;
   vip.add(vipTorso);
-  const vipHead = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), new THREE.MeshLambertMaterial({ color: 0x8a5a3b }));
+  const vipHead = new THREE.Mesh(
+    new THREE.SphereGeometry(0.26, 12, 10),
+    new THREE.MeshLambertMaterial({ color: VIP_SKIN }),
+  );
   vipHead.position.y = 1.85;
   vip.add(vipHead);
-  const vipLegs = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.75, 0.3), new THREE.MeshLambertMaterial({ color: 0x222831 }));
+  const vipLegs = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.75, 0.3),
+    new THREE.MeshLambertMaterial({ color: VIP_TROUSERS }),
+  );
   vipLegs.position.y = 0.38;
   vip.add(vipLegs);
   vip.visible = false;
   scene.add(vip);
 
-  // Police roadblocks for the Smuggler's Run: striped barriers thrown
-  // across the route the moment Mara lifts the crate. Hidden until then.
-  const roadblocks = [];
-  const blockMat = new THREE.MeshLambertMaterial({ color: 0xff7a2a });
-  const stripeMat = new THREE.MeshLambertMaterial({ color: 0xf2f2f2 });
-  for (const [bx, bz, rot] of [[-62, 186, 0], [62, 124, Math.PI / 2], [124, 0, 0]]) {
-    const block = new THREE.Group();
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(7, 1.1, 0.6), blockMat);
+  // ---- visuals: the three smuggler roadblocks ------------------------
+  const blockSpecs = [
+    { x: -62, z: 186, rot: 0 },
+    { x: 62, z: 124, rot: Math.PI / 2 },
+    { x: 124, z: 0, rot: 0 },
+  ];
+  const blockers = blockSpecs.map(({ x, z, rot }) => {
+    const g = new THREE.Group();
+    const bar = new THREE.Mesh(
+      new THREE.BoxGeometry(7, 1.1, 0.6),
+      new THREE.MeshLambertMaterial({ color: BLOCK_ORANGE }),
+    );
     bar.position.y = 0.9;
-    block.add(bar);
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(7, 0.35, 0.62), stripeMat);
+    g.add(bar);
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(7, 0.35, 0.62),
+      new THREE.MeshLambertMaterial({ color: BLOCK_WHITE }),
+    );
     stripe.position.y = 1.05;
-    block.add(stripe);
-    for (const lx of [-3, 3]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 0.5), stripeMat);
-      leg.position.set(lx, 0.45, 0);
-      block.add(leg);
+    g.add(stripe);
+    for (const sx of [-3, 3]) {
+      const leg = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.9, 0.5),
+        new THREE.MeshLambertMaterial({ color: BLOCK_WHITE }),
+      );
+      leg.position.set(sx, 0.45, 0);
+      g.add(leg);
     }
-    block.position.set(bx, 0, bz);
-    block.rotation.y = rot;
-    block.visible = false;
-    scene.add(block);
-    roadblocks.push(block);
-  }
-  function showRoadblocks() {
-    for (const b of roadblocks) b.visible = true;
-  }
-  function hideRoadblocks() {
-    for (const b of roadblocks) b.visible = false;
-  }
+    g.position.set(x, 0, z);
+    g.rotation.y = rot;
+    g.visible = false;
+    scene.add(g);
+    return g;
+  });
 
-  // Phase 5 hooks: the lighthouse job lights the island through a
-  // callback (the island module owns the beam), and the turf job counts
-  // rivals through the gangs module. Both are set by main.js.
+  // ---- hooks set by the main loop ------------------------------------
   let lighthouseHook = null;
   let turfHook = null;
+  let bobTime = 0;
+
+  function showBlockers() { for (const b of blockers) b.visible = true; }
+  function hideBlockers() { for (const b of blockers) b.visible = false; }
 
   const missions = {
-    index: 0, // current job (0..8); 9 = all done
+    index: 0,
     completed: 0,
-    timer: 0, // counts down on timed jobs
+    timer: 0,
     timeLeft: 0,
-    markerPos: MISSIONS[0].target.clone(),
+    markerPos: new THREE.Vector3(-150, 0, 225),
     started: false,
-    fareIndex: 0, // Taxi King: which fare is being picked up (0..2)
+    fareIndex: 0,
     fareTimeLeft: 0,
     vipPos: new THREE.Vector3(-62, 0, 62),
     vipWalking: false,
-    smugglerStage: 0, // Smuggler's Run: 0 = fetch the crate, 1 = deliver it
-    photoIndex: 0, // Shutterbug: which scenic spot is next (0..2)
-    photosTaken: 0, // Shutterbug: photos snapped this job
+    smugglerStage: 0,
+    photoIndex: 0,
+    photosTaken: 0,
   };
 
-  function current() {
-    return missions.index < MISSIONS.length ? MISSIONS[missions.index] : null;
+  function currentJob() {
+    return MISSIONS[missions.index] || null;
   }
 
-  function placeMarker() {
-    const m = current();
-    if (!m) {
-      marker.visible = false;
-      vip.visible = false;
-      return;
-    }
-    if (m.kind === 'bodyguard') {
-      // The beacon rides over the client, so the minimap follows him.
-      missions.markerPos.copy(missions.vipPos);
-      marker.position.copy(missions.vipPos);
-      marker.visible = true;
-      vip.visible = true;
-      vip.position.copy(missions.vipPos);
-    } else if (m.kind === 'taxi') {
-      const fare = m.fares[Math.min(missions.fareIndex, m.fares.length - 1)];
-      missions.markerPos.copy(fare);
-      marker.position.copy(fare);
-      marker.visible = true;
-      vip.visible = false;
-    } else if (m.kind === 'smuggler') {
-      // Stage 0 points at the marina pickup, stage 1 at the docks drop.
-      const spot = missions.smugglerStage === 0 ? m.pickup : m.target;
-      missions.markerPos.copy(spot);
-      marker.position.copy(spot);
-      marker.visible = true;
-      vip.visible = false;
-    } else if (m.kind === 'getaway') {
-      // No destination — the job is survival, so the beacon hides.
-      marker.visible = false;
-      vip.visible = false;
-    } else if (m.kind === 'shutterbug') {
-      const spot = m.spots[Math.min(missions.photoIndex, m.spots.length - 1)];
-      missions.markerPos.copy(spot);
-      marker.position.copy(spot);
-      marker.visible = true;
-      vip.visible = false;
-    } else {
-      missions.markerPos.copy(m.target);
-      marker.position.copy(m.target);
-      marker.visible = true;
-      vip.visible = false;
-    }
-  }
-
-  /** Reset the moving parts of the current job (VIP, fares, timers). */
+  // Put every per-job moving part back to its start-of-job state.
   function resetJobState() {
-    const m = current();
-    if (!m) return;
-    if (m.kind === 'bodyguard' && m.vipStart) {
-      missions.vipPos.copy(m.vipStart);
+    const job = currentJob();
+    missions.timeLeft = job ? (job.time || 0) : 0;
+    if (!job) return;
+    if (job.kind === 'bodyguard') {
+      missions.vipPos.copy(job.clientStart);
       missions.vipWalking = false;
-    }
-    if (m.kind === 'taxi') {
+      vip.position.copy(missions.vipPos);
+    } else if (job.kind === 'taxi') {
       missions.fareIndex = 0;
-      missions.fareTimeLeft = m.fareTime;
-    }
-    if (m.kind === 'smuggler') {
+      missions.fareTimeLeft = job.fareTime || 0;
+    } else if (job.kind === 'smuggler') {
       missions.smugglerStage = 0;
-      hideRoadblocks();
-    }
-    if (m.kind === 'shutterbug') {
+      hideBlockers();
+    } else if (job.kind === 'shutterbug') {
       missions.photoIndex = 0;
       missions.photosTaken = 0;
     }
-    if (m.kind === 'getaway') {
-      missions.timeLeft = m.timeLimit;
-    }
-    missions.timeLeft = m.timeLimit;
   }
 
-  /** Begin job i (0-based). Returns the job, or null when all are done. */
+  // Move the beacon (and the VIP) to wherever the current job points.
+  function placeMarker() {
+    const job = currentJob();
+    if (!job || job.kind === 'getaway') {
+      beacon.visible = false;
+      vip.visible = false;
+      return;
+    }
+    beacon.visible = true;
+    if (job.kind === 'bodyguard') {
+      missions.markerPos.copy(missions.vipPos);
+      vip.visible = true;
+    } else if (job.kind === 'taxi') {
+      missions.markerPos.copy(job.fares[missions.fareIndex]);
+      vip.visible = false;
+    } else if (job.kind === 'smuggler') {
+      missions.markerPos.copy(missions.smugglerStage === 0 ? job.pickup : job.target);
+      vip.visible = false;
+    } else if (job.kind === 'shutterbug') {
+      missions.markerPos.copy(job.spots[missions.photoIndex]);
+      vip.visible = false;
+    } else {
+      missions.markerPos.copy(job.target);
+      vip.visible = false;
+    }
+    beacon.position.set(missions.markerPos.x, 0, missions.markerPos.z);
+  }
+
+  // Shared finish path: pay out, advance, set up the next job.
+  function finishJob(events) {
+    const job = currentJob();
+    hideBlockers();
+    events.completed = job;
+    events.reward = job.reward;
+    missions.completed = missions.index + 1;
+    missions.index += 1;
+    missions.timer = 0;
+    const next = currentJob();
+    if (next) {
+      missions.timeLeft = next.time || 0;
+      resetJobState();
+      if (next.heatOnStart) events.heat = next.heatOnStart;
+    } else {
+      missions.timeLeft = 0;
+    }
+    placeMarker();
+    return events;
+  }
+
+  // Advance the job clock; true when a timed job just ran out.
+  function clockExpired(dt) {
+    const job = currentJob();
+    if (!job || !job.time) return false;
+    missions.timer += dt;
+    missions.timeLeft = Math.max(0, job.time - missions.timer);
+    return missions.timer >= job.time;
+  }
+
+  function flatDist(a, b) {
+    return Math.hypot(a.x - b.x, a.z - b.z);
+  }
+
   function startMission(i) {
-    missions.index = clamp(i, 0, MISSIONS.length);
-    missions.completed = i;
-    const m = current();
-    missions.timeLeft = m ? m.timeLimit : 0;
+    const idx = clamp(i, 0, MISSIONS.length);
+    missions.index = idx;
+    missions.completed = idx;
     missions.timer = 0;
     missions.started = true;
+    hideBlockers();
     resetJobState();
     placeMarker();
-    return m;
+    return currentJob();
   }
 
-  /** Restart the current job (R key): timer and marker reset. */
   function restartCurrent() {
-    const m = current();
-    if (!m) return null;
-    missions.timeLeft = m.timeLimit;
+    missions.timer = 0;
     resetJobState();
     placeMarker();
-    return m;
+    return currentJob();
   }
 
-  /** Objective line for the HUD, with live distance to the marker. */
   function objectiveText(playerPos) {
-    const m = current();
-    if (!m) return 'All jobs done — Solmar City is yours. Free roam!';
-    const tag = `JOB ${missions.index + 1}/12 — ${m.title}: `;
-    if (m.kind === 'bodyguard') {
-      const d = Math.round(Math.hypot(m.target.x - missions.vipPos.x, m.target.z - missions.vipPos.z));
-      const near = Math.hypot(missions.vipPos.x - playerPos.x, missions.vipPos.z - playerPos.z) < 18;
-      const time = ` — ${Math.max(0, Math.ceil(missions.timeLeft))}s left`;
-      return tag + `${m.briefing} Client is ${d}m from safety${near ? '' : ' — GET CLOSER, he stopped!'}${time}`;
+    const job = currentJob();
+    if (!job) return 'All jobs done — Solmar City is yours. Free roam!';
+    const head = `JOB ${missions.index + 1}/12 — ${job.title}: `;
+    const secsLeft = () => Math.max(0, Math.ceil(missions.timeLeft));
+    const timed = job.time > 0 ? ` — ${secsLeft()}s left` : '';
+    const metres = (p) => Math.round(flatDist(playerPos, p));
+    if (job.kind === 'bodyguard') {
+      const toSafety = Math.round(flatDist(missions.vipPos, job.target));
+      const maraToVip = flatDist(playerPos, missions.vipPos);
+      let line = `${job.briefing} Client is ${toSafety}m from safety`;
+      if (maraToVip >= VIP_FOLLOW_RANGE) line += ' — GET CLOSER, he stopped!';
+      line += ` — ${secsLeft()}s left`;
+      return head + line;
     }
-    if (m.kind === 'taxi') {
-      const fare = m.fares[Math.min(missions.fareIndex, m.fares.length - 1)];
-      const d = Math.round(Math.hypot(fare.x - playerPos.x, fare.z - playerPos.z));
-      return tag + `Fare ${missions.fareIndex + 1}/3 — pick up the rider (${d}m) — ${Math.max(0, Math.ceil(missions.fareTimeLeft))}s left`;
+    if (job.kind === 'taxi') {
+      const fare = job.fares[missions.fareIndex];
+      const fareSecs = Math.max(0, Math.ceil(missions.fareTimeLeft));
+      return head + `Fare ${missions.fareIndex + 1}/3 — pick up the rider (${metres(fare)}m) — ${fareSecs}s left`;
     }
-    if (m.kind === 'smuggler') {
-      const spot = missions.smugglerStage === 0 ? m.pickup : m.target;
-      const d = Math.round(Math.hypot(spot.x - playerPos.x, spot.z - playerPos.z));
-      const time = ` — ${Math.max(0, Math.ceil(missions.timeLeft))}s left`;
-      return missions.smugglerStage === 0
-        ? tag + `Pick up the crate at the marina pier (${d}m)${time}`
-        : tag + `Crate aboard — run it to the east docks (${d}m), roadblocks ahead!${time}`;
+    if (job.kind === 'smuggler') {
+      if (missions.smugglerStage === 0) {
+        return head + `Pick up the crate at the marina pier (${metres(job.pickup)}m)` + timed;
+      }
+      return head + `Crate aboard — run it to the east docks (${metres(job.target)}m), roadblocks ahead!` + timed;
     }
-    if (m.kind === 'getaway') {
-      return tag + `Stay free — ${Math.max(0, Math.ceil(missions.timeLeft))}s until the heat dies. Lose the patrol cars!`;
+    if (job.kind === 'getaway') {
+      return head + `Stay free — ${secsLeft()}s until the heat dies. Lose the patrol cars!`;
     }
-    if (m.kind === 'boat') {
-      const d = Math.round(Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z));
-      const time = m.timeLimit > 0 ? ` — ${Math.max(0, Math.ceil(missions.timeLeft))}s left` : '';
-      return tag + `Boat delivery — sail to the island jetty (${d}m), arrive by boat${time}`;
+    if (job.kind === 'boat') {
+      return head + `Boat delivery — sail to the island jetty (${metres(job.target)}m), arrive by boat` + timed;
     }
-    if (m.kind === 'lighthouse') {
-      const d = Math.round(Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z));
-      const time = m.timeLimit > 0 ? ` — ${Math.max(0, Math.ceil(missions.timeLeft))}s left` : '';
-      return tag + `Light the lighthouse on the island (${d}m)${time}`;
+    if (job.kind === 'lighthouse') {
+      return head + `Light the lighthouse on the island (${metres(job.target)}m)` + timed;
     }
-    if (m.kind === 'turf') {
+    if (job.kind === 'turf') {
       const left = turfHook ? turfHook() : 0;
-      return tag + `Clear the Sharks out of their turf — ${left} rival${left === 1 ? '' : 's'} left standing`;
+      return head + `Clear the Sharks out of their turf — ${left} rival(s) left standing`;
     }
-    if (m.kind === 'shutterbug') {
-      const spot = m.spots[Math.min(missions.photoIndex, m.spots.length - 1)];
-      const d = Math.round(Math.hypot(spot.x - playerPos.x, spot.z - playerPos.z));
-      const names = ['the beachfront', 'downtown plaza', 'the marina'];
-      return tag + `Photo ${missions.photoIndex + 1}/3 — ${names[Math.min(missions.photoIndex, 2)]} (${d}m) — press C to snap it`;
+    if (job.kind === 'shutterbug') {
+      const spot = job.spots[missions.photoIndex];
+      return head + `Photo ${missions.photoIndex + 1}/3 — ${SPOT_NAMES[missions.photoIndex]} (${metres(spot)}m) — press C to snap it`;
     }
-    const d = Math.round(Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z));
-    const time = m.timeLimit > 0 ? ` — ${Math.max(0, Math.ceil(missions.timeLeft))}s left` : '';
-    return tag + `${m.briefing} (${d}m)${time}`;
+    return head + `${job.briefing} (${metres(job.target)}m)` + timed;
   }
 
-  /** Short list of all jobs + status, for the J (jobs) panel. */
   function listText() {
-    return MISSIONS.map((m, i) => {
-      const status = i < missions.completed ? 'DONE' : i === missions.index ? 'ACTIVE' : 'LOCKED';
-      return `${i + 1}. ${m.title} — $${m.reward} — ${status}`;
+    return MISSIONS.map((job, i) => {
+      const state = i < missions.completed ? 'DONE' : (i === missions.index ? 'ACTIVE' : 'LOCKED');
+      return `${i + 1}. ${job.title} — $${job.reward} — ${state}`;
     }).join('\n');
   }
 
-  /**
-   * Phase 6: the side-hustle lines under the job list — fishing, races,
-   * courier runs, casino ledger and safehouses, one line each, so the J
-   * panel shows the whole of Mara's working life, not just Rico's jobs.
-   */
   function sideJobsText(s) {
+    const sys = s || {};
     const lines = ['— Side hustles —'];
-    if (s.fishing) lines.push(`Fishing: ${s.fishing.fishCaught} caught · $${s.fishing.cashEarned} earned`);
-    if (s.races) lines.push(`Races: ${s.races.wins} won · best ${Object.keys(s.races.best).length}/3 routes`);
-    if (s.delivery) lines.push(`Courier: ${s.delivery.jobsDone} delivered · $${s.delivery.tipsEarned} in tips`);
-    if (s.casino) lines.push(`Casino: won $${s.casino.won} · lost $${s.casino.lost}`);
-    if (s.housing) lines.push(`Safehouses: ${s.housing.ownedCount()}/3 owned`);
-    if (s.pets) lines.push(`Biscuit: ${s.pets.snacksGiven} snacks · ${s.pets.packagesFound} packages sniffed out`);
+    if (sys.fishing) {
+      lines.push(`Fishing: ${sys.fishing.fishCaught} caught · $${sys.fishing.cashEarned} earned`);
+    }
+    if (sys.races) {
+      const routes = Object.keys(sys.races.best || {}).length;
+      lines.push(`Races: ${sys.races.wins} won · best ${routes}/3 routes`);
+    }
+    if (sys.delivery) {
+      lines.push(`Courier: ${sys.delivery.jobsDone} delivered · $${sys.delivery.tipsEarned} in tips`);
+    }
+    if (sys.casino) {
+      lines.push(`Casino: won $${sys.casino.won} · lost $${sys.casino.lost}`);
+    }
+    if (sys.housing) {
+      lines.push(`Safehouses: ${sys.housing.owned.length}/3 owned`);
+    }
+    if (sys.pets) {
+      lines.push(`Biscuit: ${sys.pets.snacksGiven} snacks · ${sys.pets.packagesFound} packages sniffed out`);
+    }
     return lines.join('\n');
   }
 
-  /** Stage the Smuggler's Run mid-delivery (screenshot pose): crate
-   *  aboard, roadblocks up, beacon on the docks drop. */
-  function armSmugglerDelivery() {
-    const m = current();
-    if (!m || m.kind !== 'smuggler') return;
-    missions.smugglerStage = 1;
-    showRoadblocks();
-    placeMarker();
-  }
-
-  /**
-   * Snap a photo (C key) on the Shutterbug job. Returns events:
-   * { photoDone, photoReward, tooFar, completed, reward } — a photo
-   * pays $300 on the spot; the third completes the job (+$500 bonus).
-   */
   function snapPhoto(playerPos) {
     const events = { photoDone: false, photoReward: 0, tooFar: false, completed: null, reward: 0 };
-    const m = current();
-    if (!m || m.kind !== 'shutterbug') return events;
-    const spot = m.spots[Math.min(missions.photoIndex, m.spots.length - 1)];
-    const d = Math.hypot(spot.x - playerPos.x, spot.z - playerPos.z);
-    if (d > m.radius) {
+    const job = currentJob();
+    if (!job || job.kind !== 'shutterbug') return events;
+    const spot = job.spots[missions.photoIndex];
+    if (flatDist(playerPos, spot) > job.radius) {
       events.tooFar = true;
       return events;
     }
-    events.photoDone = true;
-    events.photoReward = m.photoReward;
     missions.photosTaken += 1;
     missions.photoIndex += 1;
-    if (missions.photoIndex >= m.spots.length) return completeJob(events);
-    placeMarker();
+    events.photoDone = true;
+    events.photoReward = job.photoReward;
+    if (missions.photoIndex >= job.spots.length) {
+      finishJob(events);
+    } else {
+      placeMarker();
+    }
     return events;
   }
 
-  /**
-   * Advance the jobs. Returns events: { completed, reward, failed, heat,
-   *   fareDone, fareReward, pickup, photoDone, photoReward } — fareDone
-   *   pays per rider on the Taxi King, pickup fires when the smuggler's
-   *   crate is lifted (roadblocks go up, heat follows).
-   * `failed` fires when a timed job runs out — the job restarts, no cash lost.
-   */
   function update(dt, playerPos, opts) {
-    const events = { completed: null, reward: 0, failed: false, heat: 0, fareDone: false, fareReward: 0, pickup: false, photoDone: false, photoReward: 0 };
-    const m = current();
-    if (!m) return events;
-    // Marker bob + spin so it reads as a live objective.
-    missions.timer += dt;
-    gem.position.y = 6 + Math.sin(missions.timer * 2.2) * 0.7;
-    gem.rotation.y += dt * 1.5;
+    const events = {
+      completed: null, reward: 0, failed: false, heat: 0,
+      fareDone: false, fareReward: 0, pickup: false,
+      photoDone: false, photoReward: 0,
+    };
+    // The beacon gem bobs and spins whether or not a job is live.
+    bobTime += dt;
+    gem.rotation.y = bobTime * 1.5;
+    gem.position.y = 6 + Math.sin(bobTime * 2.2) * 0.7;
 
-    // --- Island Hopper: sail the drop to the island jetty, by boat. ------
-    if (m.kind === 'boat') {
-      if (m.timeLimit > 0) {
-        missions.timeLeft -= dt;
-        if (missions.timeLeft <= 0) {
-          missions.timeLeft = m.timeLimit;
-          events.failed = true;
-          return events;
-        }
+    const job = currentJob();
+    if (!job) return events;
+    const options = opts || {};
+    const within = (p, r) => flatDist(playerPos, p) <= r;
+
+    if (job.kind === 'boat') {
+      if (clockExpired(dt)) {
+        events.failed = true;
+        missions.timer = 0;
+        missions.timeLeft = job.time;
+        return events;
       }
-      const d = Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z);
-      const byBoat = Boolean(opts && opts.inBoat);
-      if (d < m.radius && byBoat) return completeJob(events);
+      if (within(job.target, job.radius) && options.inBoat) finishJob(events);
       return events;
     }
 
-    // --- Lighthouse Keeper: reach the tower at night and light it. -------
-    if (m.kind === 'lighthouse') {
-      if (m.timeLimit > 0) {
-        missions.timeLeft -= dt;
-        if (missions.timeLeft <= 0) {
-          missions.timeLeft = m.timeLimit;
-          events.failed = true;
-          return events;
-        }
+    if (job.kind === 'lighthouse') {
+      if (clockExpired(dt)) {
+        events.failed = true;
+        missions.timer = 0;
+        missions.timeLeft = job.time;
+        return events;
       }
-      const d = Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z);
-      if (d < m.radius) {
+      if (within(job.target, job.radius)) {
         if (lighthouseHook) lighthouseHook();
-        return completeJob(events);
+        finishJob(events);
       }
       return events;
     }
 
-    // --- Turf War: the job ends when no Shark stands in their turf. ------
-    if (m.kind === 'turf') {
-      const left = turfHook ? turfHook() : 0;
-      if (left <= 0) return completeJob(events);
+    if (job.kind === 'turf') {
+      if (turfHook && turfHook() === 0) finishJob(events);
       return events;
     }
 
-    // --- Smuggler's Run: fetch the crate, then deliver past roadblocks. --
-    if (m.kind === 'smuggler') {
-      if (m.timeLimit > 0) {
-        missions.timeLeft -= dt;
-        if (missions.timeLeft <= 0) {
-          missions.timeLeft = m.timeLimit;
-          events.failed = true;
-          resetJobState();
-          placeMarker();
-          return events;
-        }
+    if (job.kind === 'smuggler') {
+      if (clockExpired(dt)) {
+        events.failed = true;
+        missions.timer = 0;
+        resetJobState();
+        placeMarker();
+        return events;
       }
       if (missions.smugglerStage === 0) {
-        const d = Math.hypot(m.pickup.x - playerPos.x, m.pickup.z - playerPos.z);
-        if (d < m.radius) {
+        if (within(job.pickup, job.radius)) {
           missions.smugglerStage = 1;
           events.pickup = true;
-          events.heat = m.heatOnPickup || 0;
-          showRoadblocks();
+          events.heat = job.heatOnPickup || 0;
+          showBlockers();
           placeMarker();
         }
+      } else if (within(job.target, job.radius)) {
+        finishJob(events);
+      }
+      return events;
+    }
+
+    if (job.kind === 'getaway') {
+      missions.timer += dt;
+      missions.timeLeft = Math.max(0, job.time - missions.timer);
+      if (missions.timer >= job.time) finishJob(events);
+      return events;
+    }
+
+    if (job.kind === 'shutterbug') {
+      return events; // photos only arrive through snapPhoto (the C key)
+    }
+
+    if (job.kind === 'bodyguard') {
+      if (clockExpired(dt)) {
+        events.failed = true;
+        missions.timer = 0;
+        resetJobState();
+        placeMarker();
         return events;
       }
-      const d = Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z);
-      if (d < m.radius) return completeJob(events);
-      return events;
-    }
-
-    // --- Getaway Driver: survive the timer — no destination at all. ------
-    if (m.kind === 'getaway') {
-      missions.timeLeft -= dt;
-      if (missions.timeLeft <= 0) return completeJob(events);
-      return events;
-    }
-
-    // --- Shutterbug: photos are taken with the C key (see snapPhoto). ----
-    if (m.kind === 'shutterbug') {
-      return events;
-    }
-
-    // --- Bodyguard: the client walks only while Mara stays within 18m. ---
-    if (m.kind === 'bodyguard') {
-      if (m.timeLimit > 0) {
-        missions.timeLeft -= dt;
-        if (missions.timeLeft <= 0) {
-          missions.timeLeft = m.timeLimit;
-          events.failed = true;
-          resetJobState();
-          placeMarker();
-          return events;
+      const maraToVip = flatDist(playerPos, missions.vipPos);
+      missions.vipWalking = maraToVip < VIP_FOLLOW_RANGE;
+      if (missions.vipWalking) {
+        const dx = job.target.x - missions.vipPos.x;
+        const dz = job.target.z - missions.vipPos.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0) {
+          const step = Math.min(VIP_WALK_SPEED * dt, dist);
+          missions.vipPos.x += (dx / dist) * step;
+          missions.vipPos.z += (dz / dist) * step;
+          missions.vipPos.x = clamp(missions.vipPos.x, -CITY.bound, CITY.bound);
+          missions.vipPos.z = clamp(missions.vipPos.z, -CITY.bound, CITY.bound);
         }
+        vip.position.copy(missions.vipPos);
+        missions.markerPos.copy(missions.vipPos);
+        beacon.position.set(missions.vipPos.x, 0, missions.vipPos.z);
       }
-      const near = Math.hypot(missions.vipPos.x - playerPos.x, missions.vipPos.z - playerPos.z) < 18;
-      missions.vipWalking = near;
-      if (near) {
-        const dx = m.target.x - missions.vipPos.x;
-        const dz = m.target.z - missions.vipPos.z;
-        const d = Math.hypot(dx, dz);
-        if (d > 0.5) {
-          const step = Math.min(d, 2.4 * dt);
-          missions.vipPos.x += (dx / d) * step;
-          missions.vipPos.z += (dz / d) * step;
-          vip.position.copy(missions.vipPos);
-          vip.rotation.y = Math.atan2(dx, dz);
-        }
-      }
-      marker.position.copy(missions.vipPos);
-      missions.markerPos.copy(missions.vipPos);
-      const arrived = Math.hypot(m.target.x - missions.vipPos.x, m.target.z - missions.vipPos.z) < m.radius;
-      if (arrived) return completeJob(events);
+      if (flatDist(missions.vipPos, job.target) <= job.radius) finishJob(events);
       return events;
     }
 
-    // --- Taxi King: three fares, one timer each, pay per pickup. ---
-    if (m.kind === 'taxi') {
+    if (job.kind === 'taxi') {
       missions.fareTimeLeft -= dt;
       if (missions.fareTimeLeft <= 0) {
-        missions.fareIndex = 0;
-        missions.fareTimeLeft = m.fareTime;
         events.failed = true;
+        missions.fareIndex = 0;
+        missions.fareTimeLeft = job.fareTime;
         placeMarker();
         return events;
       }
-      const fare = m.fares[Math.min(missions.fareIndex, m.fares.length - 1)];
-      const d = Math.hypot(fare.x - playerPos.x, fare.z - playerPos.z);
-      if (d < m.radius) {
+      const fare = job.fares[missions.fareIndex];
+      if (fare && within(fare, job.radius)) {
         events.fareDone = true;
-        events.fareReward = m.fareReward;
+        events.fareReward = job.fareReward;
         missions.fareIndex += 1;
-        if (missions.fareIndex >= m.fares.length) return completeJob(events);
-        missions.fareTimeLeft = m.fareTime;
-        placeMarker();
+        missions.fareTimeLeft = job.fareTime;
+        if (missions.fareIndex >= job.fares.length) finishJob(events);
+        else placeMarker();
       }
       return events;
     }
 
-    // --- Drive jobs: the original reach-the-marker rule. ---
-    if (m.timeLimit > 0) {
-      missions.timeLeft -= dt;
-      if (missions.timeLeft <= 0) {
-        missions.timeLeft = m.timeLimit;
-        events.failed = true;
-        return events;
-      }
+    // Plain drive jobs.
+    if (clockExpired(dt)) {
+      events.failed = true;
+      missions.timer = 0;
+      missions.timeLeft = job.time || 0;
+      return events;
     }
-    const d = Math.hypot(m.target.x - playerPos.x, m.target.z - playerPos.z);
-    if (d < m.radius) return completeJob(events);
+    if (within(job.target, job.radius)) finishJob(events);
     return events;
   }
 
-  /** Shared finish: advance the index, pay the reward, arm the next job. */
-  function completeJob(events) {
-    const m = current();
-    hideRoadblocks();
-    events.completed = m;
-    events.reward = m.reward;
-    missions.completed = missions.index + 1;
-    missions.index += 1;
-    const next = current();
-    if (next) {
-      missions.timeLeft = next.timeLimit;
-      resetJobState();
-      if (next.heatOnStart) events.heat = next.heatOnStart;
-    }
-    placeMarker();
-    return events;
-  }
-
-  missions.current = current;
+  missions.current = currentJob;
   missions.startMission = startMission;
   missions.restartCurrent = restartCurrent;
   missions.objectiveText = objectiveText;
@@ -649,9 +560,16 @@ export function createMissions(scene) {
   missions.sideJobsText = sideJobsText;
   missions.update = update;
   missions.snapPhoto = snapPhoto;
-  missions.armSmugglerDelivery = armSmugglerDelivery;
+  missions.armSmugglerDelivery = () => {
+    const job = currentJob();
+    if (!job || job.kind !== 'smuggler') return;
+    missions.smugglerStage = 1;
+    showBlockers();
+    placeMarker();
+  };
   missions.setLighthouseHook = (fn) => { lighthouseHook = fn; };
   missions.setTurfHook = (fn) => { turfHook = fn; };
+
   placeMarker();
   return missions;
 }

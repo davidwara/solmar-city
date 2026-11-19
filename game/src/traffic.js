@@ -1,286 +1,337 @@
-// Traffic: AI cars driving the Solmar City road grid.
-// Each car owns a street (north-south or east-west), a direction and a lane
-// offset, cruises at its own speed, turns at intersections now and then,
-// slows for the car ahead, and U-turns at the edge of the map instead of
-// driving into the sea. Traffic cars are real cars (vehicles.js), so they
-// show up on the minimap and can be bumped by the player.
+// AI traffic: cars that cruise the road grid, queue at red lights,
+// overtake parked cars and honk when they get stuck. They are scenery
+// with manners — they stop for each other and for red lights, but the
+// player is free to run a light and take the consequences.
 import * as THREE from 'three';
 import { createCar } from './vehicles.js';
 import { CITY, randomRoadPoint, nearestStreet } from './city.js';
-import { createRng, rand, randInt, pick, clamp } from './utils.js';
+import { createRng, rand, randInt, pick, clamp, angleDiff } from './utils.js';
 
-const TRAFFIC_COLORS = [0x3fae6a, 0xe8e8e8, 0x2e6fd8, 0xf2c14e, 0x8a5fc0, 0x9db98a, 0xd9a441, 0x7fb3c8];
+const PAINT = [0xd23b3b, 0x2e6fd8, 0xf2c14e, 0x3fae6a, 0x8a5fc0, 0xe8e8e8, 0x222831, 0xff7a2a];
+const LANE = 2.4; // right-hand lane offset from the street centreline
+const CYCLE = 19; // traffic-light cycle: 8 green + 1.5 amber per axis
+const AHEAD_RANGE = 11; // how far ahead a car looks for a blocker
+const AHEAD_WIDTH = 3.2; // lateral slack for "the car in front of me"
+const MAP_EDGE = 198; // U-turn line along the travel axis
+const WORLD_CLAMP = 210;
 
-/** Spawn `count` traffic cars. Returns { cars, update, place }. */
+const SIGNALS = [[0, 0], [62, 62], [-62, -62], [0, 124]];
+
+function headingFor(axis, dir) {
+  if (axis === 'ns') return dir > 0 ? 0 : Math.PI;
+  return dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+}
+
+function buildSignal(scene, ix, iz, rng) {
+  const group = new THREE.Group();
+  group.position.set(ix + 9, 0, iz + 9);
+  const dark = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 7, 8), dark);
+  pole.position.y = 3.5;
+  group.add(pole);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.1, 0.7), dark);
+  head.position.y = 7.2;
+  group.add(head);
+  const lampGeo = new THREE.SphereGeometry(0.26, 10, 8);
+  const red = new THREE.Mesh(lampGeo, new THREE.MeshBasicMaterial({ color: 0x330000 }));
+  red.position.y = 7.9;
+  group.add(red);
+  const amber = new THREE.Mesh(lampGeo, new THREE.MeshBasicMaterial({ color: 0x332200 }));
+  amber.position.y = 7.2;
+  group.add(amber);
+  const green = new THREE.Mesh(lampGeo, new THREE.MeshBasicMaterial({ color: 0x22ff66 }));
+  green.position.y = 6.5;
+  group.add(green);
+  scene.add(group);
+  const timer = rand(rng, 0, 8);
+  return {
+    group, x: ix, z: iz, timer,
+    nsGreen: timer < 9.5,
+    nsGreenSince: 0, ewGreenSince: 0,
+    red, amber, green,
+  };
+}
+
+// Advance one signal one frame: 8s NS green, 1.5s amber, 8s EW green,
+// 1.5s amber, then the cycle repeats. Lamp colours follow the phase.
+function advanceSignal(light, dt, clock) {
+  const wasNs = light.nsGreen;
+  light.timer = (light.timer + dt) % CYCLE;
+  const t = light.timer;
+  light.nsGreen = t < 9.5;
+  if (light.nsGreen && !wasNs) light.nsGreenSince = clock;
+  if (!light.nsGreen && wasNs) light.ewGreenSince = clock;
+  const phase = t < 8 ? 'ns' : t < 9.5 ? 'nsAmber' : t < 17.5 ? 'ew' : 'ewAmber';
+  light.red.material.color.setHex(phase === 'ns' || phase === 'nsAmber' ? 0x330000 : 0xff2222);
+  light.amber.material.color.setHex(phase === 'nsAmber' || phase === 'ewAmber' ? 0xffaa00 : 0x332200);
+  light.green.material.color.setHex(phase === 'ns' ? 0x22ff66 : 0x003311);
+}
+
 export function spawnTraffic(scene, seed, count = 10) {
   const rng = createRng(seed * 7919 + 13);
+  let clock = 0;
+  let hornCooldown = 0;
+
+  const lights = SIGNALS.map(([x, z]) => buildSignal(scene, x, z, rng));
+
   const cars = [];
   for (let i = 0; i < count; i++) {
-    const start = randomRoadPoint(rng);
-    const car = createCar(scene, start.x, start.z, start.axis === 'ns' ? (start.dir > 0 ? 0 : Math.PI) : (start.dir > 0 ? Math.PI / 2 : -Math.PI / 2), pick(rng, TRAFFIC_COLORS));
+    const spot = randomRoadPoint(rng);
+    const car = createCar(scene, spot.x, spot.z, headingFor(spot.axis, spot.dir), pick(rng, PAINT));
+    const cruise = rand(rng, 8, 13);
+    const speed = rand(rng, 6, 12);
+    car.speed = speed;
     cars.push({
       car,
-      axis: start.axis, // 'ns' = moving along z, 'ew' = moving along x
-      dir: start.dir,
-      lane: start.dir > 0 ? 2.4 : -2.4, // right-hand lane for the direction
-      cruise: rand(rng, 8, 13),
-      speed: rand(rng, 6, 12),
+      axis: spot.axis,
+      dir: spot.dir,
+      lane: spot.dir > 0 ? LANE : -LANE,
+      cruise,
+      speed,
       turnCooldown: rand(rng, 2, 8),
+      overtakeTimer: 0,
+      overtaking: false,
+      stuckTimer: 0,
     });
-    syncMesh(cars[i]);
   }
 
-  // --- Traffic lights -----------------------------------------------------
-  // Four signalled intersections. Each light runs its own cycle: north-south
-  // green for 8s, amber 1.5s, then east-west green 8s, amber 1.5s. AI cars
-  // stop on red for their axis; the player is free to run it (and pay for
-  // it, if the law sees). Lights are built from the same boxes as the city.
-  const lights = [];
-  const LIGHT_SPOTS = [[0, 0], [62, 62], [-62, -62], [0, 124]];
-  for (const [lx, lz] of LIGHT_SPOTS) {
-    const group = new THREE.Group();
-    const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.15, 7, 6),
-      new THREE.MeshLambertMaterial({ color: 0x2e3438 }),
-    );
-    pole.position.y = 3.5;
-    group.add(pole);
-    const head = new THREE.Mesh(
-      new THREE.BoxGeometry(0.7, 2.1, 0.7),
-      new THREE.MeshLambertMaterial({ color: 0x1c1f24 }),
-    );
-    head.position.y = 7.2;
-    group.add(head);
-    const lampGeo = new THREE.SphereGeometry(0.26, 8, 6);
-    const redMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
-    const amberMat = new THREE.MeshBasicMaterial({ color: 0x552200 });
-    const greenMat = new THREE.MeshBasicMaterial({ color: 0x115511 });
-    const red = new THREE.Mesh(lampGeo, redMat);
-    red.position.y = 7.9;
-    group.add(red);
-    const amber = new THREE.Mesh(lampGeo, amberMat);
-    amber.position.y = 7.2;
-    group.add(amber);
-    const green = new THREE.Mesh(lampGeo, greenMat);
-    green.position.y = 6.5;
-    group.add(green);
-    group.position.set(lx + 9, 0, lz + 9);
-    scene.add(group);
-    lights.push({ x: lx, z: lz, timer: rand(rng, 0, 8), nsGreen: true, redMat, amberMat, greenMat });
-  }
+  const traffic = { cars, update, place, lights, horn: false };
 
-  // Advance every light one step and paint its lamps.
-  function updateLights(dt) {
-    for (const l of lights) {
-      l.timer += dt;
-      const cycle = l.timer % 19; // 8 green + 1.5 amber, twice
-      const nsPhase = cycle < 9.5;
-      const nsGreen = nsPhase && cycle < 8;
-      const nsAmber = nsPhase && cycle >= 8;
-      const ewGreen = !nsPhase && cycle < 17.5;
-      const ewAmber = !nsPhase && cycle >= 17.5;
-      l.nsGreen = nsGreen;
-      l.redMat.color.setHex(nsGreen || nsAmber ? 0x551111 : 0xff2222);
-      l.amberMat.color.setHex(nsAmber ? 0xffaa22 : 0x552200);
-      l.greenMat.color.setHex(nsGreen ? 0x22ff66 : 0x115511);
-      l.ewGreen = ewGreen;
-      l.ewAmber = ewAmber;
+  // The nearest obstacle in the forward cone (0..11m ahead, <3.2m to
+  // the side), or null. Carries the leader's speed for queue checks.
+  function findAhead(self, obstacles) {
+    const p = self.car.pos;
+    const h = self.car.heading;
+    const sx = Math.sin(h);
+    const cx = Math.cos(h);
+    let best = null;
+    let bestFwd = AHEAD_RANGE + 1;
+    for (const o of obstacles) {
+      if (o.ref === self) continue;
+      const dx = o.pos.x - p.x;
+      const dz = o.pos.z - p.z;
+      const fwd = dx * sx + dz * cx;
+      if (fwd <= 0 || fwd > AHEAD_RANGE) continue;
+      const lat = dx * cx - dz * sx;
+      if (Math.abs(lat) >= AHEAD_WIDTH) continue;
+      if (fwd < bestFwd) { bestFwd = fwd; best = { gap: fwd, parked: o.parked, speed: o.speed }; }
     }
+    return best;
   }
 
-  // The light this car is about to cross, if any (within 16m ahead).
-  function lightAhead(w) {
-    const car = w.car;
-    for (const l of lights) {
-      const along = w.axis === 'ns' ? l.z - car.pos.z : l.x - car.pos.x;
-      const cross = w.axis === 'ns' ? Math.abs(l.x - car.pos.x) : Math.abs(l.z - car.pos.z);
-      if (w.dir > 0 ? along > 0 && along < 16 : along < 0 && along > -16) {
-        if (cross < 8) return l;
+  // The signalled intersection directly ahead on this car's street
+  // (within 16m), or null when the road ahead is unsignalled.
+  function signalAhead(self) {
+    const p = self.car.pos;
+    let best = null;
+    let bestD = 16;
+    for (const light of lights) {
+      if (self.axis === 'ns') {
+        if (Math.abs(p.x - light.x) > 8) continue;
+        const d = (light.z - p.z) * self.dir;
+        if (d > 0 && d <= bestD) { bestD = d; best = light; }
+      } else {
+        if (Math.abs(p.z - light.z) > 8) continue;
+        const d = (light.x - p.x) * self.dir;
+        if (d > 0 && d <= bestD) { bestD = d; best = light; }
       }
     }
-    return null;
+    return best;
   }
 
-  // Put a traffic wrapper's mesh exactly where its logic says it is.
-  function syncMesh(w) {
+  // How many stopped cars are queued ahead of this one on the same
+  // approach (same axis, within 8m sideways, in front, nearly still).
+  function queuedAhead(self) {
+    const p = self.car.pos;
+    const h = self.car.heading;
+    const sx = Math.sin(h);
+    const cx = Math.cos(h);
+    let n = 0;
+    for (const other of cars) {
+      if (other === self || other.axis !== self.axis) continue;
+      if (other.speed > 0.5) continue;
+      const dx = other.car.pos.x - p.x;
+      const dz = other.car.pos.z - p.z;
+      const fwd = dx * sx + dz * cx;
+      if (fwd <= 0 || fwd > 30) continue;
+      const lat = dx * cx - dz * sx;
+      if (Math.abs(lat) < 8) n += 1;
+    }
+    return n;
+  }
+
+  function stepCar(w, dt, obstacles, grip) {
+    w.turnCooldown -= dt;
+    const ahead = findAhead(w, obstacles);
+
+    // Parked cars: wait 0.6s, then swing into the opposite lane to pass.
+    // The overtake clock drains once the way ahead is clear again.
+    if (ahead && ahead.parked) {
+      w.overtakeTimer += dt;
+      if (w.overtakeTimer >= 0.6) w.overtaking = true;
+    } else if (!ahead) {
+      w.overtakeTimer = Math.max(0, w.overtakeTimer - dt);
+      if (w.overtakeTimer <= 0) w.overtaking = false;
+    }
+
+    // Ease back to the street centreline plus the lane offset (or the
+    // opposite lane while overtaking). NS cars correct x, EW cars z.
+    const centre = w.axis === 'ns'
+      ? nearestStreet(w.car.pos.x, w.car.pos.z)
+      : nearestStreet(w.car.pos.z, w.car.pos.x);
+    const laneTarget = centre + (w.overtaking ? -w.lane : w.lane);
+    const ease = Math.min(1, dt * 3);
+    if (w.axis === 'ns') w.car.pos.x += (laneTarget - w.car.pos.x) * ease;
+    else w.car.pos.z += (laneTarget - w.car.pos.z) * ease;
+
+    // Target speed: blocked means stopped; otherwise cruise, slower
+    // while overtaking, and slower still on a wet road.
+    let target = w.cruise * (w.overtaking ? 0.7 : 1) * grip;
+    if (ahead && !ahead.parked) target = 0;
+    else if (ahead && ahead.parked && !w.overtaking) target = 0;
+
+    // Signals and the queue: a red light stops the car, and a car that
+    // queued behind a stopped leader pulls away (n + 1) * 0.7s after the
+    // light turns green instead of surging with the whole line.
+    const light = signalAhead(w);
+    if (light) {
+      const redForMe = w.axis === 'ns' ? !light.nsGreen : light.nsGreen;
+      if (redForMe) {
+        target = 0;
+      } else if (ahead && !ahead.parked && ahead.gap < 12 && ahead.speed < 0.5) {
+        const greenSince = w.axis === 'ns' ? light.nsGreenSince : light.ewGreenSince;
+        const wait = (queuedAhead(w) + 1) * 0.7;
+        if (clock < greenSince + wait) target = 0;
+      }
+    }
+
+    // Honk when stuck behind someone (not a parked car) at a crawl.
+    if (ahead && !ahead.parked && w.speed < 0.5) {
+      w.stuckTimer += dt;
+      if (w.stuckTimer > 2.5 && hornCooldown <= 0) {
+        traffic.horn = true;
+        hornCooldown = 4;
+      }
+    } else {
+      w.stuckTimer = 0;
+    }
+
+    // Ease toward the target speed and keep the car object in sync —
+    // other systems read car.speed for their own queue checks.
+    w.speed += (target - w.speed) * Math.min(1, dt * 2.5);
+    w.car.speed = w.speed;
+
+    // Heading eases toward the axis direction, then the car rolls.
+    const want = headingFor(w.axis, w.dir);
+    const turn = angleDiff(w.car.heading, want);
+    w.car.heading += clamp(turn, -4 * dt, 4 * dt);
+    w.car.pos.x += Math.sin(w.car.heading) * w.speed * dt;
+    w.car.pos.z += Math.cos(w.car.heading) * w.speed * dt;
+
+    // Turns: at an intersection, with the cooldown spent and a bit of
+    // luck, snap onto the crossing street with a fresh direction.
+    if (w.turnCooldown <= 0 && rng() < 0.9 * dt) {
+      if (w.axis === 'ns') {
+        const cross = nearestStreet(w.car.pos.z, w.car.pos.x);
+        if (Math.abs(w.car.pos.z - cross) < 3) {
+          const nd = randInt(rng, 0, 1) === 0 ? -1 : 1;
+          w.axis = 'ew';
+          w.dir = nd;
+          w.lane = nd > 0 ? LANE : -LANE;
+          w.car.pos.z = cross + w.lane;
+          w.turnCooldown = rand(rng, 4, 10);
+        }
+      } else {
+        const cross = nearestStreet(w.car.pos.x, w.car.pos.z);
+        if (Math.abs(w.car.pos.x - cross) < 3) {
+          const nd = randInt(rng, 0, 1) === 0 ? -1 : 1;
+          w.axis = 'ns';
+          w.dir = nd;
+          w.lane = nd > 0 ? LANE : -LANE;
+          w.car.pos.x = cross + w.lane;
+          w.turnCooldown = rand(rng, 4, 10);
+        }
+      }
+    }
+
+    // Map edge: U-turn, clamp, and a fresh turn cooldown.
+    if (w.axis === 'ns') {
+      if (w.car.pos.z > MAP_EDGE || w.car.pos.z < -MAP_EDGE) {
+        w.dir = -w.dir;
+        w.lane = -w.lane;
+        w.car.pos.z = clamp(w.car.pos.z, -MAP_EDGE, MAP_EDGE);
+        w.turnCooldown = 4;
+      }
+    } else if (w.car.pos.x > MAP_EDGE || w.car.pos.x < -MAP_EDGE) {
+      w.dir = -w.dir;
+      w.lane = -w.lane;
+      w.car.pos.x = clamp(w.car.pos.x, -MAP_EDGE, MAP_EDGE);
+      w.turnCooldown = 4;
+    }
+    w.car.pos.x = clamp(w.car.pos.x, -WORLD_CLAMP, WORLD_CLAMP);
+    w.car.pos.z = clamp(w.car.pos.z, -WORLD_CLAMP, WORLD_CLAMP);
+
+    // Sync the mesh and spin the wheels.
     w.car.group.position.copy(w.car.pos);
     w.car.group.rotation.y = w.car.heading;
+    for (const wheel of w.car.wheels) wheel.rotation.x += w.speed * dt * 2.2;
   }
 
-  // Is another vehicle roughly ahead of wrapper w, within `dist`?
-  // Returns the blocker, or null. Parked cars are overtaken, not queued
-  // behind: a parked car sits on the centreline, so traffic would jam
-  // behind it forever if it just stopped.
-  function blockedAhead(w, vehicles, dist) {
-    const fx = Math.sin(w.car.heading);
-    const fz = Math.cos(w.car.heading);
-    for (const other of vehicles) {
-      if (other === w.car) continue;
-      const dx = other.pos.x - w.car.pos.x;
-      const dz = other.pos.z - w.car.pos.z;
-      const ahead = dx * fx + dz * fz;
-      if (ahead > 0 && ahead < dist && Math.abs(dx * fz - dz * fx) < 3.2) return other;
-    }
-    return null;
-  }
-
-  /**
-   * Drive the traffic. ctx: { playerCar (or null), playerPos, playerInCar,
-   *   parkedCars } — the player car counts as an obstacle, so traffic
-   *   queues behind Mara instead of driving through her.
-   */
   function update(dt, ctx) {
-    updateLights(dt);
+    const grip = ctx.grip == null ? 1 : ctx.grip;
+    clock += dt;
+    hornCooldown = Math.max(0, hornCooldown - dt);
+    for (const light of lights) advanceSignal(light, dt, clock);
+
     const obstacles = [];
-    for (const w of cars) obstacles.push(w.car);
-    if (ctx.playerInCar && ctx.playerCar) obstacles.push(ctx.playerCar);
-    for (const c of ctx.parkedCars || []) obstacles.push(c);
-
     for (const w of cars) {
-      w.turnCooldown -= dt;
-      const car = w.car;
-      // Overtake a parked car: swing into the other lane for a moment.
-      const blocker = blockedAhead(w, obstacles, 11);
-      const parkedBlock = blocker && (ctx.parkedCars || []).includes(blocker);
-      if (parkedBlock) w.passTimer = (w.passTimer || 0) + dt;
-      else if ((w.passTimer || 0) > 0) w.passTimer = Math.max(0, (w.passTimer || 0) - dt);
-      const overtaking = (w.passTimer || 0) > 0.6;
-      const laneTarget = overtaking ? -w.lane : w.lane;
-      // Lane position: stay on the street line plus the lane offset.
-      if (w.axis === 'ns') car.pos.x += (nearestStreet(car.pos.x) + laneTarget - car.pos.x) * Math.min(1, dt * 3);
-      else car.pos.z += (nearestStreet(car.pos.z) + laneTarget - car.pos.z) * Math.min(1, dt * 3);
-
-      // Stop for the vehicle ahead (unless overtaking a parked one); creep otherwise.
-      // Phase 4: rain slows traffic too — wet roads, cautious drivers.
-      const rainGrip = ctx.grip || 1;
-      let targetSpeed = (blocker && !parkedBlock) || (blocker && !overtaking) ? 0 : (overtaking ? w.cruise * 0.7 : w.cruise) * rainGrip;
-      // Phase 6: the intersection queue. A car that stops behind a stopped
-      // car joins a queue at its place in line; when the light turns
-      // green the queue pulls away one car at a time — each car waits a
-      // short stagger for every queued car ahead of it on the same
-      // approach — instead of the whole line surging at once.
-      const leaderStopped = blocker && !parkedBlock && Math.abs(blocker.speed || 0) < 0.5;
-      if (leaderStopped) {
-        const gap = Math.hypot(blocker.pos.x - car.pos.x, blocker.pos.z - car.pos.z);
-        if (gap < 12 && !w.queued) {
-          let ahead = 0;
-          for (const o of cars) {
-            if (o === w || !o.queued) continue;
-            const laneOff = w.axis === 'ns' ? Math.abs(o.car.pos.x - car.pos.x) : Math.abs(o.car.pos.z - car.pos.z);
-            const inFront = w.axis === 'ns' ? (o.car.pos.z - car.pos.z) * w.dir > 0 : (o.car.pos.x - car.pos.x) * w.dir > 0;
-            if (laneOff < 8 && inFront) ahead += 1;
-          }
-          w.queued = true;
-          w.goDelay = (ahead + 1) * 0.7;
-        }
-      }
-      // Red light: stop at the line instead of crossing the intersection.
-      const light = lightAhead(w);
-      const redForMe = light && (w.axis === 'ns' ? !light.nsGreen : !light.ewGreen);
-      if (redForMe) targetSpeed = 0;
-      else if (w.queued) {
-        // Green — but only pull away when this car's place comes up.
-        if ((w.goDelay || 0) > 0) {
-          w.goDelay -= dt;
-          targetSpeed = 0;
-        } else {
-          w.queued = false;
-        }
-      }
-      // Horn: stuck behind someone (or a red light queue) for a while and
-      // the driver loses patience. Main plays the sound, once per honk.
-      if (blocker && !parkedBlock && w.speed < 0.5) {
-        w.blockedTimer = (w.blockedTimer || 0) + dt;
-        if (w.blockedTimer > 2.5) {
-          w.blockedTimer = -4; // cooldown before the next honk
-          traffic.horn = true;
-        }
-      } else if ((w.blockedTimer || 0) > 0) {
-        w.blockedTimer = 0;
-      }
-      w.speed += (targetSpeed - w.speed) * Math.min(1, dt * 2.5);
-      car.speed = w.speed; // keep the car object honest for queue checks
-
-      // Heading follows axis + direction, eased so turns look like turns.
-      const wantHeading = w.axis === 'ns' ? (w.dir > 0 ? 0 : Math.PI) : (w.dir > 0 ? Math.PI / 2 : -Math.PI / 2);
-      let dh = wantHeading - car.heading;
-      while (dh > Math.PI) dh -= Math.PI * 2;
-      while (dh < -Math.PI) dh += Math.PI * 2;
-      car.heading += dh * Math.min(1, dt * 4);
-
-      car.pos.x += Math.sin(car.heading) * w.speed * dt;
-      car.pos.z += Math.cos(car.heading) * w.speed * dt;
-
-      // Turn at an intersection sometimes: snap onto the crossing street.
-      const along = w.axis === 'ns' ? car.pos.z : car.pos.x;
-      const cross = nearestStreet(along);
-      if (w.turnCooldown <= 0 && Math.abs(along - cross) < 3 && rng() < dt * 0.9) {
-        if (w.axis === 'ns') {
-          w.axis = 'ew';
-          car.pos.z = cross;
-          w.dir = rng() < 0.5 ? 1 : -1;
-        } else {
-          w.axis = 'ns';
-          car.pos.x = cross;
-          w.dir = rng() < 0.5 ? 1 : -1;
-        }
-        w.lane = w.dir > 0 ? 2.4 : -2.4;
-        w.turnCooldown = rand(rng, 4, 10);
-      }
-
-      // Edge of the map: U-turn instead of leaving the city.
-      if (w.axis === 'ns' && (car.pos.z > 198 || car.pos.z < -198)) {
-        w.dir *= -1;
-        w.lane *= -1;
-        car.pos.z = clamp(car.pos.z, -198, 198);
-        w.turnCooldown = 4;
-      }
-      if (w.axis === 'ew' && (car.pos.x > 198 || car.pos.x < -198)) {
-        w.dir *= -1;
-        w.lane *= -1;
-        car.pos.x = clamp(car.pos.x, -198, 198);
-        w.turnCooldown = 4;
-      }
-      car.pos.x = clamp(car.pos.x, -210, 210);
-      car.pos.z = clamp(car.pos.z, -210, 210);
-      syncMesh(w);
-      for (const wh of car.wheels) wh.rotation.x += w.speed * dt * 2.2;
+      obstacles.push({ pos: w.car.pos, parked: false, speed: w.speed, ref: w });
     }
+    if (ctx.playerInCar && ctx.playerCar) {
+      obstacles.push({ pos: ctx.playerCar.pos, parked: false, speed: ctx.playerCar.speed, ref: null });
+    }
+    for (const parked of (ctx.parkedCars || [])) {
+      obstacles.push({ pos: parked.pos, parked: true, speed: 0, ref: null });
+    }
+    for (const w of cars) stepCar(w, dt, obstacles, grip);
   }
 
-  // Stage one traffic car at an exact spot (used by ?shot= poses).
+  // Stage one car at an exact spot (screenshot poses).
   function place(i, x, z, axis, dir, speed = 10) {
     const w = cars[i % cars.length];
     w.axis = axis;
     w.dir = dir;
-    w.lane = dir > 0 ? 2.4 : -2.4;
+    w.lane = dir > 0 ? LANE : -LANE;
     w.cruise = speed;
     w.speed = speed;
+    w.car.speed = speed;
     w.car.pos.set(x, 0, z);
-    w.car.heading = axis === 'ns' ? (dir > 0 ? 0 : Math.PI) : (dir > 0 ? Math.PI / 2 : -Math.PI / 2);
-    syncMesh(w);
+    w.car.heading = headingFor(axis, dir);
+    w.car.group.position.copy(w.car.pos);
+    w.car.group.rotation.y = w.car.heading;
     return w;
   }
 
-  const traffic = { cars, update, place, lights, horn: false };
   return traffic;
 }
 
-/** True when the player's car freshly overlaps a traffic car (crash). */
+// True when the player's car freshly overlaps a traffic car: the player
+// has to be moving, a traffic car has to be within 3.6m, and the
+// cooldown has to be spent. On a fresh crash the traffic car is shoved
+// sideways and the player loses just over half their speed.
 export function trafficCrash(traffic, playerCar, cooldown) {
   if (!playerCar || Math.abs(playerCar.speed) < 3) return false;
+  if (!cooldown || cooldown.value > 0) return false;
   for (const w of traffic.cars) {
-    const d = Math.hypot(w.car.pos.x - playerCar.pos.x, w.car.pos.z - playerCar.pos.z);
-    if (d < 3.6) {
-      if (cooldown.value <= 0) {
-        cooldown.value = 2;
-        // Shove the traffic car sideways and slow the player down.
-        w.car.pos.x += (w.car.pos.x - playerCar.pos.x) * 0.4;
-        w.car.pos.z += (w.car.pos.z - playerCar.pos.z) * 0.4;
-        playerCar.speed *= 0.45;
-        return true;
-      }
-      return false;
+    const dx = w.car.pos.x - playerCar.pos.x;
+    const dz = w.car.pos.z - playerCar.pos.z;
+    if (Math.hypot(dx, dz) < 3.6) {
+      cooldown.value = 2;
+      w.car.pos.x += dx * 0.4;
+      w.car.pos.z += dz * 0.4;
+      w.car.group.position.copy(w.car.pos);
+      playerCar.speed *= 0.45;
+      return true;
     }
   }
   return false;
