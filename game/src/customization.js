@@ -22,6 +22,8 @@ export const PAINTS = [
   { name: 'Midnight', color: 0x222831, css: '#222831' },
   // Phase 6: the seventh paint — matte shark grey, for race nights.
   { name: 'Shark Grey', color: 0x6b7280, css: '#6b7280' },
+  // Phase 7: the eighth paint — island teal, for the bay at noon.
+  { name: 'Island Teal', color: 0x2a9d8f, css: '#2a9d8f' },
 ];
 export const PAINT_PRICE = 200;
 export const ENGINE_PRICES = [500, 1000]; // level 1, then level 2
@@ -129,6 +131,12 @@ export function createCustomization(scene, hooks) {
       `<button data-kind="engine" ${engNext === null ? 'disabled' : ''}>`
       + (engNext === null ? '✓ Engine MAX (Lv 2)' : `Engine Lv ${state.engineLevel + 1} — $${engNext} (+top speed)`),
     );
+    // Phase 7: strip the paint back to factory, free — the car keeps its
+    // engine and armour, only the colour goes back to how it rolled in.
+    rows.push(
+      `<button data-kind="factory" ${state.paintIndex < 0 ? 'disabled' : ''}>`
+      + (state.paintIndex < 0 ? '✓ Factory paint' : 'Back to factory paint — FREE'),
+    );
     rows.push(
       `<button data-kind="armor" ${state.armor ? 'disabled' : ''}>`
       + (state.armor ? '✓ Armour fitted (+50 max health)' : `Bolt-on armour — $${ARMOR_PRICE} (+50 max health)`),
@@ -169,6 +177,13 @@ export function createCustomization(scene, hooks) {
         if (hooks.onBought) hooks.onBought(`Engine Lv ${state.engineLevel} fitted — $${price}. She pulls harder now.`);
       } else if (hooks.onBought) {
         hooks.onBought(`Not enough cash — Engine Lv ${state.engineLevel + 1} is $${price}.`);
+      }
+    } else if (kind === 'factory') {
+      // Back to factory paint: the next car Mara takes keeps its own
+      // coat, and the saved paint choice is cleared.
+      if (state.paintIndex >= 0) {
+        state.paintIndex = -1;
+        if (hooks.onBought) hooks.onBought('Factory paint restored — the next ride keeps its own coat.');
       }
     } else if (kind === 'armor') {
       if (hooks.spend(ARMOR_PRICE)) {

@@ -1,5 +1,5 @@
 // Story: mission intro cutscenes for Mara Voss.
-// Before jobs 1, 4, 7 and 10 a short dialogue plays over the city: the
+// Before jobs 1, 4, 7, 10 and 12 a short dialogue plays over the city: the
 // speaker's name in gold, their line typed out letter by letter, any key
 // (or click) to advance, another to skip the rest. The game pauses while
 // a cutscene runs — the city waits, the story doesn't. Lines are written
@@ -9,7 +9,7 @@ import { createRng } from './utils.js';
 
 // Dialogue scripts, keyed by the job they introduce (0-based job index).
 // Job 1: First Job. Job 4: Night Run. Job 7: Smuggler's Run. Job 10:
-// Island Hopper — the first job across the bay.
+// Island Hopper — the first job across the bay. Job 12: Turf War.
 const SCRIPTS = {
   0: [
     { who: 'Dex', line: 'Mara. You owe me for the harbour bail — so you work it off. One package, marina pier, no questions.' },
@@ -31,10 +31,17 @@ const SCRIPTS = {
     { who: 'Mara', line: 'An island drop. Who lives out there that needs a courier?' },
     { who: 'Rosa', line: 'People who own the island. Mind the lighthouse on the way back — it sees everything.' },
   ],
+  // Phase 7: job 12, Turf War — the last job, and the one where Mara
+  // stops running errands and starts taking the streets for herself.
+  11: [
+    { who: 'Dex', line: 'The Sharks think the north streets are theirs. They are not — not anymore. Clear them out.' },
+    { who: 'Mara', line: 'You want me to take on a whole crew? Dex, I am one courier.' },
+    { who: 'Dex', line: 'One courier the whole city is already scared of. Stand your ground, Mara. The turf pays for itself.' },
+  ],
 };
 
 /** The jobs that open with a cutscene (0-based). */
-export const STORY_JOBS = [0, 3, 6, 9];
+export const STORY_JOBS = [0, 3, 6, 9, 11];
 
 /** Create the cutscene player. Returns show / advance / update. */
 export function createStory() {

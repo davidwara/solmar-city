@@ -77,6 +77,8 @@ export function spawnPedestrians(scene, seed, count = 26) {
       tourist: i < 3,
       photoTimer: rand(rng, 4, 12),
       photoPause: 0,
+      // Phase 7: wave timer — counts down while the arm stays raised.
+      waveTimer: 0,
     });
   }
 
@@ -171,6 +173,15 @@ export function spawnPedestrians(scene, seed, count = 26) {
         p.barkTimer -= dt;
         if (p.barkTimer <= 0) bark(p, pick(rng, IDLE_BARKS));
       }
+      // Phase 7: a wave — when Mara strolls past within 3m on foot, a
+      // calm resident raises an arm and says hello instead of walking on.
+      if (p.fleeTimer <= 0 && !threats.playerInCar && threats.playerPos) {
+        const pd = Math.hypot(threats.playerPos.x - p.pos.x, threats.playerPos.z - p.pos.z);
+        if (pd < 3 && p.barkTimer > 5) {
+          p.waveTimer = 1.2;
+          bark(p, 'Hey, Mara!');
+        }
+      }
       // Flee: a fast car within 7m sends this ped running away from it.
       if (p.fleeTimer <= 0) {
         for (const c of cars) {
@@ -236,7 +247,13 @@ export function spawnPedestrians(scene, seed, count = 26) {
       p.parts.legL.rotation.x = swing;
       p.parts.legR.rotation.x = -swing;
       p.parts.armL.rotation.x = -swing * 0.8;
-      p.parts.armR.rotation.x = swing * 0.8;
+      // A waving arm stays raised while the timer runs, over the swing.
+      if (p.waveTimer > 0) {
+        p.waveTimer -= dt;
+        p.parts.armR.rotation.x = -2.6;
+      } else {
+        p.parts.armR.rotation.x = swing * 0.8;
+      }
     }
   }
 

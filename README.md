@@ -84,6 +84,34 @@ bat** ($50, longer reach than a fist, no ammo). The J panel lists the
 side hustles under the twelve jobs, and the minimap marks the pier, the
 race flag and gates, the house doors, the casino, the depots and Biscuit.
 
+## The living city (Phase 7)
+
+Phase 7 rewrote the game from the inside out and left the streets
+exactly as Mara knows them. The city generator, the procedural audio,
+the HUD and minimap, the mission / traffic / police systems, the
+bootstrap and loop, and the build program are all fresh
+implementations — same city, same sounds, same HUD, same build output,
+new code underneath.
+
+And every system got one small sharpener: boats drag in the shallows
+near the beach; three winning slot spins in a row pay a $25 streak
+bonus; the package hunt now points a compass bearing at the nearest
+stash; punches combo into faster swings; the garage sells an eighth
+paint (Island Teal) and strips a car back to factory paint for free;
+the street lamps wake up early in the golden hour; fast courier runs
+earn a $15 rush bonus; the bay gives up old boots worth $5 scrap;
+standing on turf Mara owns doubles its pay; a fourth safehouse — the
+Lighthouse Cottage ($12,000) — waits by the lighthouse; gulls circle
+the tower; residents wave and say hello when Mara strolls past;
+sprinting costs stamina (walk to catch her breath, shown on a new gold
+bar under the health bar); a fourth race, the Downtown Loop ($400),
+joins the calendar; saves keep a backup slot so one bad write never
+eats the story; a new dawn pose stages sunrise over the marina; the
+Turf War job opens with a cutscene of its own; shot-up cars limp at
+14 m/s until the garage patches them; the hospital bill is capped at
+$500; the gun shop sells boxes of 24 rounds for $60; and lightning
+wanders — each strike relights the sky from a new corner of the city.
+
 ## The living city (Phase 5)
 
 Solmar City grew across the bay. A second island district sits south of

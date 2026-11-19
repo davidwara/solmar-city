@@ -33,6 +33,33 @@ export function pick(rng, arr) {
   return arr[Math.floor(rng() * arr.length)];
 }
 
+/**
+ * Phase 7: a shuffled copy of an array (Fisher–Yates on the given rng)
+ * — the original is never touched, so a deck or a route order can be
+ * dealt out without mutating the source list.
+ */
+export function shuffle(rng, arr) {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = out[i];
+    out[i] = out[j];
+    out[j] = tmp;
+  }
+  return out;
+}
+
+/**
+ * Phase 7: seconds as "1:23.4" — the same shape the race clock uses,
+ * for any timer the HUD or a results line wants to print.
+ */
+export function formatDuration(sec) {
+  const t = Math.max(0, sec || 0);
+  const m = Math.floor(t / 60);
+  const s = (t % 60).toFixed(1).padStart(4, '0');
+  return `${m}:${s}`;
+}
+
 export function clamp(v, min, max) {
   return v < min ? min : v > max ? max : v;
 }

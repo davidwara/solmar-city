@@ -15,6 +15,9 @@ export const SHOP_POS = new THREE.Vector3(10.5, 0, 62);
 // Phase 6: the melee bat — cheap, longer reach than a bare fist, no ammo.
 export const BAT_PRICE = 50;
 export const BAT_REACH = 3.6;
+// Phase 7: a box of reserve rounds — $60 for 24, sold at the same shop.
+export const AMMO_BOX_PRICE = 60;
+export const AMMO_BOX_ROUNDS = 24;
 
 // A canvas sign for the shop front: green board, white lettering, no assets.
 function shopSignTexture() {
@@ -144,6 +147,18 @@ export function createWeapons(scene) {
     return 'ok';
   }
 
+  /**
+   * Phase 7: buy a box of reserve rounds at the shop — $60 for 24.
+   * Returns 'ok', 'no-gun' (buy the pistol first) or 'broke'. Money
+   * moves in main.
+   */
+  function buyAmmo(money) {
+    if (!weapons.owned) return 'no-gun';
+    if (money < AMMO_BOX_PRICE) return 'broke';
+    weapons.reserve += AMMO_BOX_ROUNDS;
+    return 'ok';
+  }
+
   /** Melee reach: the bat's 3.6m when owned, otherwise the bare-fist 2.4m. */
   function meleeReach() {
     return weapons.bat ? BAT_REACH : 2.4;
@@ -152,6 +167,7 @@ export function createWeapons(scene) {
   /** HUD line: pistol + rounds, or the shop hint when unarmed. */
   function ammoText() {
     if (!weapons.owned) return 'NO GUN — visit the GUN SHOP ($400)';
+    if (weapons.mag === 0 && weapons.reserve === 0) return 'OUT OF AMMO — G at the shop, $60 a box';
     if (weapons.reloadTimer > 0) return `RELOADING… ${weapons.mag} / ${weapons.reserve}`;
     return `PISTOL ${weapons.mag} / ${weapons.reserve}`;
   }
@@ -264,6 +280,7 @@ export function createWeapons(scene) {
   weapons.nearShop = nearShop;
   weapons.buy = buy;
   weapons.buyBat = buyBat;
+  weapons.buyAmmo = buyAmmo;
   weapons.meleeReach = meleeReach;
   weapons.ammoText = ammoText;
   weapons.shoot = shoot;

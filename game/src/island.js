@@ -234,6 +234,17 @@ export function buildIsland(scene, seed) {
   buildCauseway(scene);
   const lighthouse = buildLighthouse(scene);
 
+  // Phase 7: gulls — three white birds circling the lighthouse tower,
+  // so the island reads as alive from the marina even before the beam.
+  const gulls = [];
+  const gullMat = new THREE.MeshBasicMaterial({ color: 0xf2f2f2 });
+  for (let i = 0; i < 3; i++) {
+    const gull = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.6, 4), gullMat);
+    gull.rotation.x = Math.PI / 2;
+    scene.add(gull);
+    gulls.push({ mesh: gull, angle: (i / 3) * Math.PI * 2, radius: 10 + i * 3, height: 28 + i * 3 });
+  }
+
   let lit = false;
   let beamAngle = 0;
 
@@ -249,6 +260,16 @@ export function buildIsland(scene, seed) {
    *  fading in at dusk and out at dawn, dark by day. */
   function update(dt, hours) {
     const beam = lighthouseBeamIntensity(hours);
+    // The gulls circle the tower, each on its own ring and height.
+    for (const g of gulls) {
+      g.angle += dt * 0.45;
+      g.mesh.position.set(
+        LIGHTHOUSE_POS.x + Math.sin(g.angle) * g.radius,
+        g.height + Math.sin(g.angle * 2.3) * 1.5,
+        LIGHTHOUSE_POS.z + Math.cos(g.angle) * g.radius,
+      );
+      g.mesh.rotation.y = g.angle;
+    }
     if (lit && beam > 0.05) {
       beamAngle += dt * 0.55;
       lighthouse.beamPivot.rotation.y = beamAngle;

@@ -70,6 +70,16 @@ export function damageCar(car, n = 1) {
   return car.hp === 0;
 }
 
+/**
+ * Phase 7: patch a car back to full health (the garage's work, once Mara
+ * pays for it) — a shot-up car that could only limp is roadworthy again.
+ */
+export function repairCar(car) {
+  if (!car || typeof car.hp !== 'number') return false;
+  car.hp = 3;
+  return true;
+}
+
 /** Park a row of cars along the roads so the player can steal one. */
 export function spawnParkedCars(scene, rngSeed) {
   const spots = [
@@ -93,7 +103,10 @@ export function updateCar(car, dt, input, colliders, bound, grip = 1) {
   // Drag + rolling resistance.
   car.speed -= car.speed * 0.55 * dt;
   if (!input.forward && !input.back) car.speed -= car.speed * 1.1 * dt;
-  car.speed = clamp(car.speed, -9, 30 + (car.engineLevel || 0) * 6); // garage engine upgrades raise the top speed
+  // Phase 7: limp mode — a car down to its last hit point can only crawl
+  // at 14 m/s, so gunfire has a cost even before the engine dies.
+  const topSpeed = (car.hp ?? 3) <= 1 ? 14 : 30 + (car.engineLevel || 0) * 6;
+  car.speed = clamp(car.speed, -9, topSpeed); // garage engine upgrades raise the top speed
   if (Math.abs(car.speed) < 0.05 && !input.forward && !input.back) car.speed = 0;
   // Steering scales with speed and flips in reverse.
   const steerTarget = (input.left ? 1 : 0) - (input.right ? 1 : 0);

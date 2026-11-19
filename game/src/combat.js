@@ -27,10 +27,15 @@ export function applyKnockdown(target, ms) {
 
 /** Create the combat state (just a cooldown timer). */
 export function createCombat() {
-  const combat = { cooldown: 0 };
+  const combat = { cooldown: 0, combo: 0, comboTimer: 0 };
 
   function update(dt) {
     if (combat.cooldown > 0) combat.cooldown -= dt;
+    // The combo window: 1.5s without a landed punch and the streak is gone.
+    if (combat.comboTimer > 0) {
+      combat.comboTimer -= dt;
+      if (combat.comboTimer <= 0) combat.combo = 0;
+    }
   }
 
   /**
@@ -40,7 +45,9 @@ export function createCombat() {
    */
   function tryPunch(player, peds, reach = PUNCH_RANGE) {
     if (combat.cooldown > 0) return null;
-    combat.cooldown = PUNCH_COOLDOWN;
+    // Phase 7: a combo — landed punches inside the window swing faster,
+    // down to a 0.25s floor; a miss breaks the streak.
+    combat.cooldown = Math.max(0.25, PUNCH_COOLDOWN - combat.combo * 0.05);
     setPunch(player);
     const fx = Math.sin(player.heading);
     const fz = Math.cos(player.heading);
@@ -53,8 +60,11 @@ export function createCombat() {
       // Must be in front of Mara (dot product with facing direction).
       if ((dx * fx + dz * fz) / Math.max(d, 0.001) < 0.35) continue;
       peds.knockDown(p);
+      combat.combo += 1;
+      combat.comboTimer = 1.5;
       return p;
     }
+    combat.combo = 0;
     return null;
   }
 

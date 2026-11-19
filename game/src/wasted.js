@@ -18,7 +18,9 @@ export function createWasted() {
 
   /** Cash lost to the hospital bill: 10% of what Mara carries. */
   function hospitalBill(money) {
-    return Math.floor(money * 0.1);
+    // Phase 7: the bill is capped at $500 — St. Solmar has seen worse
+    // nights than Mara's, and it charges like it.
+    return Math.min(500, Math.floor(money * 0.1));
   }
 
   /**
@@ -28,9 +30,10 @@ export function createWasted() {
    * hospitalBill().
    */
   function billBreakdown(money) {
-    const bed = Math.floor(money * 0.04);
-    const treatment = Math.floor(money * 0.1) - bed;
-    return { bed, treatment, total: bed + treatment };
+    const total = hospitalBill(money);
+    const bed = Math.min(Math.floor(money * 0.04), 200);
+    const treatment = total - bed;
+    return { bed, treatment, total };
   }
 
   /**

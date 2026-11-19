@@ -10,3 +10,5 @@ shot-p4/
 shot-p5/
 # Phase 6: Phase 6 screenshot staging profiles (fishing/race poses).
 shot-p6/
+# Phase 7: local dossier build output (mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts).
+out/

@@ -54,6 +54,9 @@ export function createPlayer(scene) {
     walkPhase: 0,
     moving: false,
     running: false,
+    // Phase 7: sprint stamina — running drains it, walking tops it back
+    // up; empty legs mean Mara walks until she catches her breath.
+    stamina: 100,
     aiming: false, // pistol raised (Phase 3): right arm points forward
     punchTimer: 0, // counts down while the punch animation plays (combat.js)
   };
@@ -119,6 +122,14 @@ export function updatePlayer(player, dt, input, cameraYaw, colliders, bound) {
   const len = Math.hypot(mx, mz);
   player.moving = len > 0;
   player.running = player.moving && input.run;
+  // Phase 7: stamina — a sprint costs 12 a second, a walk or a stand
+  // gives back 8; at zero Mara drops to a walk whether Shift is held.
+  if (player.running) {
+    player.stamina = Math.max(0, player.stamina - 12 * dt);
+    if (player.stamina <= 0) player.running = false;
+  } else {
+    player.stamina = Math.min(100, player.stamina + 8 * dt);
+  }
   if (player.moving) {
     mx /= len;
     mz /= len;

@@ -225,6 +225,13 @@ export function createBoats(scene) {
       drivenBoat.pos.z = BAY.minZ;
       if (drivenBoat.speed > 0 && Math.cos(drivenBoat.heading) < 0) drivenBoat.speed *= 0.2;
     }
+    // Phase 7: shallow-water drag — within 20m of the beach line the
+    // sandbar drags on the hull, so a boat loses way as it noses into
+    // the shallows instead of charging the sand at full speed.
+    const shallow = shallowAt(drivenBoat.pos.x, drivenBoat.pos.z);
+    if (shallow > 0) {
+      drivenBoat.speed -= drivenBoat.speed * 0.9 * shallow * dt;
+    }
     drivenBoat.pos.x = clamp(drivenBoat.pos.x, BAY.minX, BAY.maxX);
     drivenBoat.pos.z = clamp(drivenBoat.pos.z, BAY.minZ, BAY.maxZ);
     if (drivenBoat.pos.x <= BAY.minX || drivenBoat.pos.x >= BAY.maxX) drivenBoat.speed *= 0.5;
@@ -259,4 +266,16 @@ export function createBoats(scene) {
   }
 
   return { boats, update, nearest, shorePoint, speedKmh, bay: BAY };
+}
+
+/**
+ * Phase 7: how shallow the water is at a point — 0 in open water,
+ * rising to 1 at the beach line — so hulls, wakes and the pier can all
+ * feel the sandbar the same way. Only the beach side is shallow; the
+ * bay stays deep east, west and south.
+ */
+export function shallowAt(x, z) {
+  if (z >= BAY.minZ + 20) return 0;
+  if (z <= BAY.minZ) return 1;
+  return 1 - (z - BAY.minZ) / 20;
 }

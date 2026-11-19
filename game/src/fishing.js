@@ -14,12 +14,14 @@ import { clamp } from './utils.js';
 // over it so the bobber always lands in open water.
 export const PIER_POS = { x: 100, z: 232 };
 export const PIER_TIP = { x: 100, z: 256 };
-export const FISH_PRICES = { Minnow: 15, Bass: 40, 'Golden Koi': 200 };
+export const FISH_PRICES = { Minnow: 15, Bass: 40, 'Golden Koi': 200, 'Old Boot': 5 };
 
 const CATCH_TABLE = [
   { kind: 'Minnow', weight: 58, color: 0x9fb8c8 },
   { kind: 'Bass', weight: 32, color: 0x5a7a4a },
   { kind: 'Golden Koi', weight: 10, color: 0xf2c14e },
+  // Phase 7: the bay gives up junk too — an old boot, worth $5 as scrap.
+  { kind: 'Old Boot', weight: 8, color: 0x5a4028 },
 ];
 
 export function createFishing(scene, audio) {
@@ -70,6 +72,9 @@ export function createFishing(scene, audio) {
     cashEarned: 0,
     lastCatch: '',
     goldenBites: 0,
+    // Phase 7: the catch log — the last five things on the line, newest
+    // first, so the pier keeps its own scorecard.
+    catchLog: [],
   };
 
   /** True when Mara stands on (or at the root of) the pier, on foot. */
@@ -111,6 +116,8 @@ export function createFishing(scene, audio) {
     fishing.bucket.push(caught.kind);
     fishing.fishCaught += 1;
     fishing.lastCatch = caught.kind;
+    fishing.catchLog.unshift(caught.kind);
+    if (fishing.catchLog.length > 5) fishing.catchLog.pop();
     if (caught.kind === 'Golden Koi') fishing.goldenBites += 1;
     if (audio && audio.chime) audio.chime();
     return caught.kind;
@@ -169,6 +176,13 @@ export function createFishing(scene, audio) {
     return '';
   }
 
+  /** Phase 7: the catch log as one line — "Bass, Minnow, Old Boot" —
+   *  or '' before the first cast. */
+  function catchLogText() {
+    if (fishing.catchLog.length === 0) return '';
+    return `Last catches: ${fishing.catchLog.join(', ')}`;
+  }
+
   /** What the hint bar should say when Mara stands on the pier. */
   function promptText() {
     if (fishing.state === 'bite') return 'F — REEL IT IN!';
@@ -205,6 +219,7 @@ export function createFishing(scene, audio) {
   fishing.sell = sell;
   fishing.update = update;
   fishing.statusText = statusText;
+  fishing.catchLogText = catchLogText;
   fishing.promptText = promptText;
   fishing.markers = markers;
   fishing.saveData = saveData;

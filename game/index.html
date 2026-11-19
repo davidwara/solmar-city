@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e1620">
 <title>Solmar City — Open-World Crime</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1620;
@@ -59,7 +60,11 @@
   #health-label { font-size: 13px; letter-spacing: 2px; color: #ffd9de; text-shadow: 0 1px 3px #000; }
   #health-bar { height: 14px; background: rgba(0,0,0,0.55); border: 1px solid #fff; border-radius: 7px; overflow: hidden; }
   #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff4d6d, #ff8a5c); }
-  #objective { position: absolute; top: 64px; left: 16px; max-width: 560px; font-size: 15px; color: #fff;
+  /* Phase 7: sprint stamina — a thin gold bar under the health bar. */
+  #stamina-bar { height: 6px; margin-top: 4px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.6); border-radius: 3px; overflow: hidden; }
+  #stamina-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ffd23f, #ff9a3d); }
+  #stamina-label { font-size: 10px; letter-spacing: 2px; color: rgba(255,233,168,0.85); text-shadow: 0 1px 3px #000; margin-top: 2px; }
+  #objective { position: absolute; top: 80px; left: 16px; max-width: 560px; font-size: 15px; color: #fff;
     background: rgba(0,0,0,0.45); padding: 7px 12px; border-left: 4px solid #ffd23f; border-radius: 4px; }
   #toast { position: absolute; top: 118px; left: 50%; transform: translateX(-50%); display: none;
     font-size: 16px; font-weight: bold; color: #ffd23f; background: rgba(0,0,0,0.6);
@@ -89,6 +94,8 @@
   <div id="health-wrap">
     <div id="health-label">HEALTH <span id="health-text">100</span></div>
     <div id="health-bar"><div id="health-fill"></div></div>
+    <div id="stamina-bar"><div id="stamina-fill"></div></div>
+    <div id="stamina-label">STAMINA</div>
   </div>
   <div id="objective">Meet Rico at the marina — drive south to the pier</div>
   <div id="toast"></div>

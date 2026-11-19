@@ -65,6 +65,8 @@ createServer((request, response) => {
   if (pathname.endsWith('/')) pathname += 'index.html';
   const file = resolve(join(root, normalize(pathname)));
   if (file !== root && !file.startsWith(root + sep)) {
+    // Phase 7: log refused paths too, so a playtest shows the escape attempt.
+    console.log(`${request.method} ${pathname} -> 403 (outside game/)`);
     response.writeHead(403).end('forbidden');
     return;
   }
@@ -74,6 +76,8 @@ createServer((request, response) => {
     if (!stats.isFile()) throw new Error('not a file');
     size = stats.size;
   } catch {
+    // Phase 7: log missing files, so a 404 in a playtest names the path.
+    console.log(`${request.method} ${pathname} -> 404 (not found)`);
     response.writeHead(404).end('not found');
     return;
   }
@@ -81,7 +85,17 @@ createServer((request, response) => {
     'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
     'content-length': size,
     'cache-control': 'no-store',
+    // Phase 7: never let a browser sniff a .js file as something else.
+    'x-content-type-options': 'nosniff',
   });
+  // Phase 7: one log line per request, so a playtest shows what loaded.
+  console.log(`${request.method} ${pathname} -> 200 (${size} bytes)`);
+  // Phase 7: HEAD answers with headers only — health checks and probes
+  // can ask whether a file exists without downloading the game.
+  if (request.method === 'HEAD') {
+    response.end();
+    return;
+  }
   createReadStream(file).pipe(response);
 }).listen(port, '127.0.0.1', () => {
   console.log(`game/ is on http://localhost:${port}`);

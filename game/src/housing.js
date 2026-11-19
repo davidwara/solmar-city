@@ -37,6 +37,17 @@ export const HOUSES = [
     wall: 0xe6d7b8,
     roof: 0x3fae6a,
   },
+  // Phase 7: the Lighthouse Cottage — the priciest roof in Solmar, a
+  // stone's throw from the lighthouse on the island's south shore.
+  {
+    id: 'cottage',
+    name: 'Lighthouse Cottage',
+    price: 12000,
+    door: { x: 140, z: 420 },
+    room: { x: 152, z: 420 },
+    wall: 0xd9a441,
+    roof: 0xd23b3b,
+  },
 ];
 
 const ROOM_W = 11;
@@ -198,7 +209,7 @@ export function createHousing(scene) {
       return `Home — ${house ? house.name : ''} · E to step out`;
     }
     if (housing.owned.length > 0) {
-      return `Safehouses ${housing.owned.length}/3 owned${housing.respawn ? ' · respawn: home' : ''}`;
+      return `Safehouses ${housing.owned.length}/${HOUSES.length} owned${housing.respawn ? ' · respawn: home' : ''}`;
     }
     return '';
   }

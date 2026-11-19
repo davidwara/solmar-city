@@ -2,6 +2,9 @@
 // wanted level, and health. Saved on every mission completion and when the
 // game is paused; loaded from the start screen's Continue button.
 const SAVE_KEY = 'solmar-city-save-v1';
+// Phase 7: the previous save is kept under a backup key, so one bad
+// write (or a full store) never eats Mara's whole story.
+const BACKUP_KEY = 'solmar-city-save-v1-backup';
 
 /** Read the save, or null when there is none / it is unreadable. */
 export function loadSave() {
@@ -10,7 +13,24 @@ export function loadSave() {
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (typeof data !== 'object' || data === null) return null;
-    return {
+    return normalizeSave(data);
+  } catch {
+    // The main save is unreadable — fall back to the backup, if any.
+    try {
+      const backup = window.localStorage.getItem(BACKUP_KEY);
+      if (!backup) return null;
+      const data = JSON.parse(backup);
+      if (typeof data !== 'object' || data === null) return null;
+      return normalizeSave(data);
+    } catch {
+      return null;
+    }
+  }
+}
+
+/** Coerce a parsed save object into the shape the game expects. */
+function normalizeSave(data) {
+  return {
       money: typeof data.money === 'number' ? data.money : 1250,
       missionsCompleted: typeof data.missionsCompleted === 'number' ? data.missionsCompleted : 0,
       bestWanted: typeof data.bestWanted === 'number' ? data.bestWanted : 0,
@@ -34,15 +54,15 @@ export function loadSave() {
       casino: data.casino && typeof data.casino === 'object' ? data.casino : null,
       delivery: data.delivery && typeof data.delivery === 'object' ? data.delivery : null,
       pets: data.pets && typeof data.pets === 'object' ? data.pets : null,
-    };
-  } catch {
-    return null;
-  }
+  };
 }
 
 /** Write the save. Never throws (a full/blocked store just skips). */
 export function saveGame(data) {
   try {
+    // Rotate the backup first: the current save becomes the fallback.
+    const current = window.localStorage.getItem(SAVE_KEY);
+    if (current) window.localStorage.setItem(BACKUP_KEY, current);
     window.localStorage.setItem(SAVE_KEY, JSON.stringify({
       money: data.money,
       missionsCompleted: data.missionsCompleted,
@@ -84,5 +104,6 @@ export function hasSave() {
 export function clearSave() {
   try {
     window.localStorage.removeItem(SAVE_KEY);
+    window.localStorage.removeItem(BACKUP_KEY);
   } catch { /* ignore */ }
 }

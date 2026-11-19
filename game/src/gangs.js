@@ -107,6 +107,20 @@ export function createGangs(scene, seed) {
     return n;
   }
 
+  /**
+   * Phase 7: the turf income as one line — "Turf $100/min · 2 zones" —
+   * or '' while Mara holds nothing. The rate is $50 a turf a minute,
+   * doubled while she stands on her own ground collecting in person.
+   */
+  function turfIncomeText(playerPos) {
+    const owned = ownedCount();
+    if (owned === 0) return '';
+    const here = playerPos ? zoneAt(playerPos) : null;
+    const collecting = here && here.owner === 'mara';
+    const rate = owned * TURF_PAY_PER_MIN * (collecting ? 2 : 1);
+    return `Turf $${rate}/min · ${owned} zone${owned > 1 ? 's' : ''}${collecting ? ' · collecting' : ''}`;
+  }
+
   /** Rivals still standing in a gang's turf (Turf War job progress). */
   function rivalsAliveIn(gangId) {
     let n = 0;
@@ -184,10 +198,13 @@ export function createGangs(scene, seed) {
       }
     }
 
-    // Passive income: every owned turf banks $50 a minute.
+    // Passive income: every owned turf banks $50 a minute. Phase 7:
+    // collecting on the spot — standing inside turf Mara already owns
+    // doubles the tick, she is shaking the till down in person.
     const owned = ownedCount();
     if (owned > 0) {
-      incomeAcc += dt * owned * (TURF_PAY_PER_MIN / 60);
+      const collecting = here && here.owner === 'mara';
+      incomeAcc += dt * owned * (TURF_PAY_PER_MIN / 60) * (collecting ? 2 : 1);
       if (incomeAcc >= TURF_PAY_PER_MIN) {
         incomeAcc -= TURF_PAY_PER_MIN;
         events.income = TURF_PAY_PER_MIN;
@@ -265,6 +282,7 @@ export function createGangs(scene, seed) {
     update,
     zoneAt,
     ownedCount,
+    turfIncomeText,
     rivalsAliveIn,
     armTurfMission,
     knockDown,

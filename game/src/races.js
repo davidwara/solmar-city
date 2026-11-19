@@ -1,4 +1,4 @@
-// Street races: three checkpoint routes around Solmar City, run from the
+// Street races: four checkpoint routes around Solmar City, run from the
 // chequered flag at the Solmar Garage. Mara pulls up in a car, presses T
 // at the flag, and gets a 3-2-1-GO countdown. Each route is a chain of
 // glowing gates on the avenues — drive through them in order and the
@@ -50,6 +50,19 @@ export const RACE_ROUTES = [
       { x: -20, z: 380 },
       { x: 40, z: 320 },
       { x: 40, z: 186 },
+      { x: 124, z: 186 },
+    ],
+  },
+  // Phase 7: the Downtown Loop — a tight figure round the towers, $400.
+  {
+    name: 'Downtown Loop',
+    prize: 400,
+    gates: [
+      { x: 124, z: 186 },
+      { x: 124, z: -124 },
+      { x: -62, z: -124 },
+      { x: -62, z: 62 },
+      { x: 62, z: 62 },
       { x: 124, z: 186 },
     ],
   },
@@ -244,7 +257,7 @@ export function createRaces(scene) {
   }
 
   function promptText() {
-    return 'T — race: Harbour Sprint $300 · Beachfront Dash $500 · Island Loop $800';
+    return 'T — race: Harbour Sprint $300 · Beachfront Dash $500 · Island Loop $800 · Downtown Loop $400';
   }
 
   /** Minimap markers: start flag, plus the next gate while racing. */

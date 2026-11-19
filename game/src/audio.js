@@ -1,8 +1,28 @@
-// Audio: fully procedural WebAudio sound — no audio files, no network.
-// Engine hum follows the car's speed, a two-tone siren wails while the
-// player is wanted, and pickups / mission completions play little jingles.
-// The context is created lazily on the first user gesture (the start
-// button), so headless screenshot runs stay silent. M toggles mute.
+// Sound: fully procedural WebAudio for Solmar City — no audio files,
+// no network. One lazy AudioContext holds the master gain plus three
+// persistent voices (car engine, boat engine + spray, police siren) and
+// every one-shot effect is a short oscillator blip. If the browser has
+// no audio (headless runs), the context stays null and every call is a
+// safe no-op — sound is garnish, it must never break the game.
+
+// The car radio: two stations, each a tempo, a looping bass line and a
+// flavour (hats on SOLMAR FM, a slow pad chord on NIGHT TIDE).
+const STATIONS = [
+  null,
+  {
+    name: 'SOLMAR FM — Bassline', bpm: 126,
+    bass: [55, 0, 65.41, 0, 49, 0, 58.27, 73.42],
+    hat: true, pad: null,
+  },
+  {
+    name: 'NIGHT TIDE — Synth', bpm: 84,
+    bass: [110, 0, 0, 0, 87.31, 0, 0, 0],
+    hat: false, pad: [220, 261.63, 329.63],
+  },
+];
+
+/** Create the audio system. All state lives on the returned object so
+ *  the game can read the engine / siren / radio voices directly. */
 export function createAudio() {
   const audio = {
     muted: false,
@@ -17,278 +37,282 @@ export function createAudio() {
     sirenGain: null,
     sirenLfo: null,
     stepTimer: 0,
-    // Phase 4 — car radio: 0 off, 1 SOLMAR FM (bassline + hats), 2 NIGHT
-    // TIDE (slow synth pads). Q cycles the station while driving.
-    radioStation: 0,
+    radioStation: 0, // 0 = off, 1 = SOLMAR FM, 2 = NIGHT TIDE
     radioStep: 0,
     radioTimer: 0,
   };
 
-  // Radio stations: name, tempo, and the notes each one leans on.
-  const RADIO = [
-    null,
-    { name: 'SOLMAR FM — Bassline', bpm: 126, bass: [55, 0, 65.41, 0, 49, 0, 58.27, 73.42] },
-    { name: 'NIGHT TIDE — Synth', bpm: 84, bass: [110, 0, 0, 0, 87.31, 0, 0, 0], pad: [220, 261.63, 329.63] },
-  ];
-
+  /** Build (once) the context, the master gain and the three persistent
+   *  voices, all silent at first. Resume a suspended context. */
   function ensure() {
     if (audio.ctx) {
       if (audio.ctx.state === 'suspended') audio.ctx.resume().catch(() => {});
-      return true;
+      return audio.ctx;
     }
     try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return false;
-      audio.ctx = new AC();
-      audio.master = audio.ctx.createGain();
-      audio.master.gain.value = audio.muted ? 0 : 0.5;
-      audio.master.connect(audio.ctx.destination);
-      // Engine: a low sawtooth whose pitch follows speed.
-      audio.engineOsc = audio.ctx.createOscillator();
-      audio.engineOsc.type = 'sawtooth';
-      audio.engineOsc.frequency.value = 55;
-      audio.engineGain = audio.ctx.createGain();
-      audio.engineGain.gain.value = 0;
-      const engineFilter = audio.ctx.createBiquadFilter();
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctor();
+      const master = ctx.createGain();
+      master.gain.value = audio.muted ? 0 : 0.5;
+      master.connect(ctx.destination);
+
+      // Car engine: sawtooth through a low-pass, its own gain.
+      const engineOsc = ctx.createOscillator();
+      engineOsc.type = 'sawtooth';
+      engineOsc.frequency.value = 55;
+      const engineFilter = ctx.createBiquadFilter();
       engineFilter.type = 'lowpass';
       engineFilter.frequency.value = 420;
-      audio.engineOsc.connect(engineFilter);
-      engineFilter.connect(audio.engineGain);
-      audio.engineGain.connect(audio.master);
-      audio.engineOsc.start();
-      // Boat engine: a low triangle hum plus filtered white-noise wash
-      // (the outboard's spray), both silent until a boat is driven.
-      audio.boatEngineOsc = audio.ctx.createOscillator();
-      audio.boatEngineOsc.type = 'triangle';
-      audio.boatEngineOsc.frequency.value = 42;
-      audio.boatEngineGain = audio.ctx.createGain();
-      audio.boatEngineGain.gain.value = 0;
-      audio.boatEngineOsc.connect(audio.boatEngineGain);
-      audio.boatEngineGain.connect(audio.master);
-      audio.boatEngineOsc.start();
-      const noiseBuf = audio.ctx.createBuffer(1, audio.ctx.sampleRate, audio.ctx.sampleRate);
+      const engineGain = ctx.createGain();
+      engineGain.gain.value = 0;
+      engineOsc.connect(engineFilter);
+      engineFilter.connect(engineGain);
+      engineGain.connect(master);
+      engineOsc.start();
+
+      // Boat engine: triangle, plus looped white noise through a
+      // band-pass for the spray — two gains, one voice each.
+      const boatEngineOsc = ctx.createOscillator();
+      boatEngineOsc.type = 'triangle';
+      boatEngineOsc.frequency.value = 42;
+      const boatEngineGain = ctx.createGain();
+      boatEngineGain.gain.value = 0;
+      boatEngineOsc.connect(boatEngineGain);
+      boatEngineGain.connect(master);
+      boatEngineOsc.start();
+      const noiseLen = ctx.sampleRate;
+      const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
       const noiseData = noiseBuf.getChannelData(0);
-      for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
-      const noiseSrc = audio.ctx.createBufferSource();
-      noiseSrc.buffer = noiseBuf;
-      noiseSrc.loop = true;
-      const noiseFilter = audio.ctx.createBiquadFilter();
-      noiseFilter.type = 'bandpass';
-      noiseFilter.frequency.value = 320;
-      noiseFilter.Q.value = 0.8;
-      audio.boatNoiseGain = audio.ctx.createGain();
-      audio.boatNoiseGain.gain.value = 0;
-      noiseSrc.connect(noiseFilter);
-      noiseFilter.connect(audio.boatNoiseGain);
-      audio.boatNoiseGain.connect(audio.master);
-      noiseSrc.start();
-      // Siren: a sine that wails between two tones via an LFO.
-      audio.sirenOsc = audio.ctx.createOscillator();
-      audio.sirenOsc.type = 'sine';
-      audio.sirenOsc.frequency.value = 750;
-      audio.sirenLfo = audio.ctx.createOscillator();
-      audio.sirenLfo.type = 'square';
-      audio.sirenLfo.frequency.value = 1.6;
-      const lfoGain = audio.ctx.createGain();
-      lfoGain.gain.value = 220;
-      audio.sirenLfo.connect(lfoGain);
-      lfoGain.connect(audio.sirenOsc.frequency);
-      audio.sirenGain = audio.ctx.createGain();
-      audio.sirenGain.gain.value = 0;
-      audio.sirenOsc.connect(audio.sirenGain);
-      audio.sirenGain.connect(audio.master);
-      audio.sirenOsc.start();
-      audio.sirenLfo.start();
+      for (let i = 0; i < noiseLen; i++) noiseData[i] = Math.random() * 2 - 1;
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuf;
+      noise.loop = true;
+      const sprayFilter = ctx.createBiquadFilter();
+      sprayFilter.type = 'bandpass';
+      sprayFilter.frequency.value = 320;
+      sprayFilter.Q.value = 0.8;
+      const boatNoiseGain = ctx.createGain();
+      boatNoiseGain.gain.value = 0;
+      noise.connect(sprayFilter);
+      sprayFilter.connect(boatNoiseGain);
+      boatNoiseGain.connect(master);
+      noise.start();
+
+      // Police siren: a sine wobbled by a slow square LFO.
+      const sirenOsc = ctx.createOscillator();
+      sirenOsc.type = 'sine';
+      sirenOsc.frequency.value = 750;
+      const sirenGain = ctx.createGain();
+      sirenGain.gain.value = 0;
+      sirenOsc.connect(sirenGain);
+      sirenGain.connect(master);
+      sirenOsc.start();
+      const sirenLfo = ctx.createOscillator();
+      sirenLfo.type = 'square';
+      sirenLfo.frequency.value = 1.6;
+      const lfoDepth = ctx.createGain();
+      lfoDepth.gain.value = 220;
+      sirenLfo.connect(lfoDepth);
+      lfoDepth.connect(sirenOsc.frequency);
+      sirenLfo.start();
+
+      audio.ctx = ctx;
+      audio.master = master;
+      audio.engineOsc = engineOsc;
+      audio.engineGain = engineGain;
+      audio.boatEngineOsc = boatEngineOsc;
+      audio.boatEngineGain = boatEngineGain;
+      audio.boatNoiseGain = boatNoiseGain;
+      audio.sirenOsc = sirenOsc;
+      audio.sirenGain = sirenGain;
+      audio.sirenLfo = sirenLfo;
+      return ctx;
     } catch {
+      // No audio here (headless): stay null, every sound stays silent.
       audio.ctx = null;
-      return false;
+      return null;
     }
-    return true;
   }
 
-  function blip(freq, dur, type = 'sine', vol = 0.25, when = 0) {
-    if (!audio.ctx) return;
-    try {
-      const t = audio.ctx.currentTime + when;
-      const osc = audio.ctx.createOscillator();
-      osc.type = type;
-      osc.frequency.value = freq;
-      const g = audio.ctx.createGain();
-      g.gain.setValueAtTime(vol, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      osc.connect(g);
-      g.connect(audio.master);
-      osc.start(t);
-      osc.stop(t + dur + 0.02);
-    } catch { /* sound is garnish, never fatal */ }
+  /** One-shot note: an oscillator with a gain envelope that decays to
+   *  silence just after the duration. `when` delays it in seconds. */
+  function blip(freq, dur, type = 'sine', vol = 0.2, when = 0) {
+    if (!audio.ctx || !audio.master) return;
+    const ctx = audio.ctx;
+    const t0 = ctx.currentTime + when;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.value = freq;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(Math.max(0.0001, vol), t0);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    osc.connect(gain);
+    gain.connect(audio.master);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
   }
 
-  /** Call on the start button / first keypress: unlocks the context. */
-  function unlock() { ensure(); }
+  /** Unlock audio (start button / first keypress — headless screenshot
+   *  runs never call this, so they stay silent). */
+  function unlock() {
+    ensure();
+  }
 
+  /** Flip mute, retune the master gain, return the new muted state. */
   function toggleMute() {
     audio.muted = !audio.muted;
-    if (audio.master) audio.master.gain.value = audio.muted ? 0 : 0.5;
+    if (audio.master && audio.ctx) {
+      audio.master.gain.setTargetAtTime(audio.muted ? 0 : 0.5, audio.ctx.currentTime, 0.05);
+    }
     return audio.muted;
   }
 
-  /** Cash pickup / small reward chime: two rising notes. */
+  // --- one-shot effects (each ensures the context first) ---
   function chime() {
     ensure();
-    blip(660, 0.12);
-    blip(990, 0.18, 'sine', 0.25, 0.1);
+    blip(660, 0.25, 'sine', 0.2);
+    blip(990, 0.35, 'sine', 0.2, 0.12);
   }
 
-  /** Mission complete jingle: a four-note rising arpeggio. */
   function jingle() {
     ensure();
-    [523, 659, 784, 1047].forEach((f, i) => blip(f, 0.22, 'triangle', 0.28, i * 0.11));
+    [523, 659, 784, 1047].forEach((f, i) => blip(f, 0.22, 'triangle', 0.22, i * 0.11));
   }
 
-  /** Dull thud for a crash or a punch landing. */
   function thud() {
     ensure();
-    blip(90, 0.18, 'sine', 0.4);
-    blip(60, 0.22, 'triangle', 0.3, 0.02);
+    blip(90, 0.18, 'sine', 0.3);
+    blip(60, 0.25, 'sine', 0.25, 0.02);
   }
 
-  /** Pistol shot: a sharp crack (noise burst via a fast square blip). */
   function gunshot() {
     ensure();
-    blip(180, 0.09, 'square', 0.4);
-    blip(90, 0.14, 'sawtooth', 0.3, 0.01);
+    blip(180, 0.12, 'square', 0.3);
+    blip(90, 0.18, 'sawtooth', 0.25, 0.01);
   }
 
-  /** Dry click when the magazine is empty. */
   function dryClick() {
     ensure();
-    blip(1200, 0.04, 'square', 0.12);
+    blip(1200, 0.05, 'square', 0.15);
   }
 
-  /** Reload click-clack: two short metallic ticks. */
   function reloadClick() {
     ensure();
-    blip(900, 0.05, 'square', 0.15);
-    blip(700, 0.05, 'square', 0.15, 0.18);
+    blip(900, 0.06, 'square', 0.18);
+    blip(700, 0.06, 'square', 0.18, 0.09);
   }
 
-  /** Boat engine: pitch + spray follow the driven boat's speed 0..1.
-   *  Call every frame from boats.js; 0 (or no boat) silences it. */
-  function setBoatEngine(speed01) {
-    ensure();
-    if (!audio.ctx) return;
-    const s = Math.max(0, Math.min(1, speed01 || 0));
-    try {
-      if (audio.boatEngineOsc) {
-        audio.boatEngineGain.gain.setTargetAtTime(s > 0.02 ? 0.03 + 0.05 * s : 0, audio.ctx.currentTime, 0.15);
-        audio.boatEngineOsc.frequency.setTargetAtTime(42 + s * 55, audio.ctx.currentTime, 0.15);
-      }
-      if (audio.boatNoiseGain) {
-        audio.boatNoiseGain.gain.setTargetAtTime(s > 0.02 ? 0.025 * s : 0, audio.ctx.currentTime, 0.2);
-      }
-    } catch { /* sound is garnish, never fatal */ }
-  }
-
-  /** Car horn: two-tone beep, the sound of Solmar traffic losing patience. */
   function horn() {
     ensure();
-    blip(370, 0.28, 'square', 0.16);
-    blip(466, 0.28, 'square', 0.14);
+    blip(370, 0.25, 'square', 0.2);
+    blip(466, 0.25, 'square', 0.2, 0.02);
   }
 
-  /** Thunder: a low rumble that follows a lightning strike (storms). */
   function thunder() {
     ensure();
-    blip(48, 1.4, 'sawtooth', 0.32);
-    blip(62, 1.1, 'triangle', 0.22, 0.12);
-    blip(38, 1.8, 'sine', 0.25, 0.3);
+    blip(48, 1.2, 'sine', 0.35);
+    blip(62, 1.0, 'sine', 0.25, 0.1);
+    blip(38, 1.4, 'sine', 0.3, 0.05);
   }
 
-  /** Camera shutter click for the Shutterbug job (C key). */
   function shutter() {
     ensure();
-    blip(2200, 0.04, 'square', 0.18);
-    blip(1300, 0.06, 'square', 0.14, 0.07);
+    blip(2200, 0.05, 'square', 0.2);
+    blip(1300, 0.05, 'square', 0.2, 0.08);
   }
 
-  /** Phase 6: a splash when a fish takes the bait on the pier. */
   function splash() {
     ensure();
-    blip(320, 0.25, 'sine', 0.3);
-    blip(180, 0.3, 'triangle', 0.22, 0.06);
-    blip(520, 0.12, 'sine', 0.14, 0.02);
+    blip(320, 0.2, 'sine', 0.2);
+    blip(180, 0.25, 'sine', 0.18, 0.08);
+    blip(520, 0.15, 'sine', 0.15, 0.16);
   }
 
-  /** Phase 6: Biscuit's bark — two short square yaps. */
   function dogBark() {
     ensure();
-    blip(740, 0.09, 'square', 0.2);
-    blip(660, 0.11, 'square', 0.18, 0.13);
+    blip(740, 0.09, 'square', 0.22);
+    blip(660, 0.09, 'square', 0.22, 0.14);
   }
 
-  /** Cycle the car radio: off -> SOLMAR FM -> NIGHT TIDE -> off. */
+  /** Drive the boat engine voice: gain rises with speed, pitch climbs
+   *  from 42 Hz, spray follows the wake. Silent (or no boat) is 0.
+   *  Every change eases over ~0.15–0.2s. */
+  function setBoatEngine(speed01) {
+    if (!audio.ctx) return;
+    const s = Math.max(0, Math.min(1, speed01 || 0));
+    const moving = s > 0.02;
+    const t = audio.ctx.currentTime;
+    audio.boatEngineGain.gain.setTargetAtTime(moving ? 0.03 + 0.05 * s : 0, t, 0.15);
+    audio.boatEngineOsc.frequency.setTargetAtTime(42 + 55 * s, t, 0.15);
+    audio.boatNoiseGain.gain.setTargetAtTime(moving ? 0.025 * s : 0, t, 0.2);
+  }
+
+  /** Cycle off → SOLMAR FM → NIGHT TIDE → off. Returns the new
+   *  station's name ('' when off). */
   function toggleStation() {
-    ensure();
-    audio.radioStation = (audio.radioStation + 1) % RADIO.length;
+    audio.radioStation = (audio.radioStation + 1) % STATIONS.length;
     audio.radioStep = 0;
     audio.radioTimer = 0;
     return stationName();
   }
 
-  /** Current station name for the HUD ('' means the radio is off). */
+  /** The current station's name, or '' when the radio is off. */
   function stationName() {
-    const st = RADIO[audio.radioStation];
+    const st = STATIONS[audio.radioStation];
     return st ? st.name : '';
   }
 
-  /** One radio step: a bass note, a hat tick, or a pad chord. */
+  /** Play one radio step: the bass note for this step (0s are rests),
+   *  a hat tick on odd steps for SOLMAR FM, and the slow pad chord on
+   *  the first beat of each bar for NIGHT TIDE. */
   function radioStep() {
-    const st = RADIO[audio.radioStation];
+    const st = STATIONS[audio.radioStation];
     if (!st) return;
-    const i = audio.radioStep % st.bass.length;
-    const bassNote = st.bass[i];
-    if (bassNote > 0) blip(bassNote, 0.22, 'triangle', 0.2);
-    // Hats on the off-beats keep the bassline moving.
-    if (audio.radioStation === 1 && audio.radioStep % 2 === 1) blip(6000, 0.03, 'square', 0.045);
-    // NIGHT TIDE lays a slow pad over the first beat of each bar.
-    if (audio.radioStation === 2 && audio.radioStep % 8 === 0 && st.pad) {
-      for (const f of st.pad) blip(f, 1.6, 'sine', 0.05);
+    const note = st.bass[audio.radioStep % st.bass.length];
+    if (note) blip(note, 0.22, 'triangle', 0.22);
+    if (st.hat && audio.radioStep % 2 === 1) blip(6000, 0.03, 'square', 0.06);
+    if (st.pad && audio.radioStep % st.bass.length === 0) {
+      for (const f of st.pad) blip(f, 1.6, 'sine', 0.07);
     }
     audio.radioStep += 1;
   }
 
-  /**
-   * Per-frame sound: engine pitch from speed, siren while wanted,
-   * soft footsteps while Mara runs on foot.
-   */
-  function update(dt, s) {
+  /** Per-frame audio: engine hum follows the driven car's speed, the
+   *  siren wails while wanted, footsteps tick while Mara walks or runs
+   *  on foot, and the radio steps on eighth notes — only while driving.
+   *  No context (or muted) means nothing to do. */
+  function update(dt, s = {}) {
     if (!audio.ctx || audio.muted) return;
-    try {
-      if (audio.engineOsc) {
-        const target = s.inCar ? 0.05 + Math.min(0.12, Math.abs(s.speed) * 0.004) : 0;
-        audio.engineGain.gain.setTargetAtTime(target, audio.ctx.currentTime, 0.1);
-        audio.engineOsc.frequency.setTargetAtTime(55 + Math.abs(s.speed) * 5, audio.ctx.currentTime, 0.1);
+    const t = audio.ctx.currentTime;
+    const speed = Math.abs(s.speed || 0);
+    const inCar = s.inCar === true;
+    const wanted = s.wanted || 0;
+    // Engine: a floor of 0.05 plus up to 0.12 with speed, in a car only;
+    // pitch climbs 5 Hz per unit of speed from 55 Hz.
+    const engineTarget = inCar ? 0.05 + 0.12 * Math.min(1, speed / 30) : 0;
+    audio.engineGain.gain.setTargetAtTime(engineTarget, t, 0.1);
+    audio.engineOsc.frequency.setTargetAtTime(55 + 5 * speed, t, 0.1);
+    // Siren: a steady 0.05 while the law is after Mara.
+    audio.sirenGain.gain.setTargetAtTime(wanted > 0 ? 0.05 : 0, t, 0.2);
+    // Footsteps on foot: a soft tick every ~0.32s running, ~0.45s walking.
+    if (!inCar && s.moving) {
+      audio.stepTimer -= dt;
+      if (audio.stepTimer <= 0) {
+        audio.stepTimer = s.running ? 0.32 : 0.45;
+        blip(140, 0.05, 'sine', 0.08);
       }
-      if (audio.sirenGain) {
-        audio.sirenGain.gain.setTargetAtTime(s.wanted > 0 ? 0.05 : 0, audio.ctx.currentTime, 0.3);
+    }
+    // Radio: only while driving, stepped on eighth notes of the tempo.
+    if (inCar && audio.radioStation > 0) {
+      const eighth = 60 / STATIONS[audio.radioStation].bpm / 2;
+      audio.radioTimer -= dt;
+      if (audio.radioTimer <= 0) {
+        audio.radioTimer += eighth;
+        radioStep();
       }
-      if (s.moving && !s.inCar) {
-        audio.stepTimer -= dt;
-        if (audio.stepTimer <= 0) {
-          audio.stepTimer = s.running ? 0.32 : 0.45;
-          blip(140 + Math.random() * 40, 0.05, 'sine', 0.07);
-        }
-      }
-      // Radio: only while driving, stepped on the station's tempo.
-      if (s.inCar && audio.radioStation > 0) {
-        const st = RADIO[audio.radioStation];
-        audio.radioTimer -= dt;
-        if (audio.radioTimer <= 0) {
-          audio.radioTimer += 60 / st.bpm / 2; // eighth notes
-          radioStep();
-        }
-      }
-    } catch { /* never break the game for sound */ }
+    } else {
+      audio.radioTimer = 0;
+    }
   }
 
   audio.unlock = unlock;

@@ -107,6 +107,24 @@ export function createCollectibles(scene, seed) {
     return best;
   }
 
+  /**
+   * Phase 7: which way the nearest package lies, as a compass point plus
+   * a rough distance — "NE · ~120m" — so a hunter knows which way to
+   * walk without the minimap giving the spot away. '' when the set is done.
+   */
+  function nearestDirection(pos) {
+    const target = nearestPackage(pos);
+    if (!target) return '';
+    const dx = target.x - pos.x;
+    const dz = target.z - pos.z;
+    const d = Math.hypot(dx, dz);
+    // North is -z on this map; eight compass points from the bearing.
+    const bearing = Math.atan2(dx, -dz);
+    const points = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const idx = Math.round(bearing / (Math.PI / 4) + 8) % 8;
+    return `${points[idx]} · ~${Math.round(d / 10) * 10}m`;
+  }
+
   /** Move one package to a spot (screenshot poses stage a grab in frame). */
   function stageOne(x, z) {
     const it = items.find((p) => !p.taken);
@@ -158,6 +176,7 @@ export function createCollectibles(scene, seed) {
   collectibles.counterText = counterText;
   collectibles.nearby = nearby;
   collectibles.nearestPackage = nearestPackage;
+  collectibles.nearestDirection = nearestDirection;
   collectibles.stageOne = stageOne;
   collectibles.restore = restore;
   collectibles.update = update;

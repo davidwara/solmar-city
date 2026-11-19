@@ -55,6 +55,7 @@ export function createCasino(scene, audio) {
     lost: 0,
     biggestWin: 0,
     spins: 0,
+    streak: 0, // Phase 7: consecutive winning spins — three in a row pays a $25 streak bonus
     lastSpin: '',
     hiLo: null, // { card, pot, round } while a card round is live
     lastHiLo: '',
@@ -88,8 +89,17 @@ export function createCasino(scene, audio) {
     if (delta > 0) {
       casino.won += delta;
       casino.biggestWin = Math.max(casino.biggestWin, delta);
+      // A hot machine: three winning spins in a row pays a $25 streak bonus.
+      casino.streak += 1;
+      if (casino.streak >= 3) {
+        casino.streak = 0;
+        delta += 25;
+        casino.won += 25;
+        text += ' Hot streak — +$25 bonus!';
+      }
       if (audio && audio.jingle) audio.jingle();
     } else {
+      casino.streak = 0;
       casino.lost += SLOT_BET;
       if (audio && audio.dryClick) audio.dryClick();
     }
@@ -174,7 +184,7 @@ export function createCasino(scene, audio) {
   }
 
   function saveData() {
-    return { won: casino.won, lost: casino.lost, biggestWin: casino.biggestWin, spins: casino.spins };
+    return { won: casino.won, lost: casino.lost, biggestWin: casino.biggestWin, spins: casino.spins, streak: casino.streak };
   }
 
   function restore(data) {
@@ -183,6 +193,7 @@ export function createCasino(scene, audio) {
     if (typeof data.lost === 'number') casino.lost = data.lost;
     if (typeof data.biggestWin === 'number') casino.biggestWin = data.biggestWin;
     if (typeof data.spins === 'number') casino.spins = data.spins;
+    if (typeof data.streak === 'number') casino.streak = Math.max(0, Math.min(2, data.streak));
   }
 
   casino.nearCasino = nearCasino;

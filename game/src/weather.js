@@ -149,6 +149,25 @@ export function createWeather(scene, city, daynight) {
     return WEATHER_ICON[weather.mode];
   }
 
+  /**
+   * Phase 7: seconds until the sky changes its mind — the cycle timer
+   * counting down — so a driver can tell whether the rain is about to
+   * break before the next corner.
+   */
+  function nextChangeIn() {
+    return Math.max(0, Math.round(weather.duration - weather.timer));
+  }
+
+  /**
+   * Phase 7: what the sky is turning into next — clear follows rain and
+   * storms, rain follows clear, and only rain ever turns into a storm.
+   */
+  function forecast() {
+    if (weather.mode === 'clear') return 'rain or clear skies';
+    if (weather.mode === 'rain') return 'a storm, or clearing up';
+    return 'clear skies';
+  }
+
   function update(dt, focusPos, audio) {
     // --- the cycle: drift from mode to mode on a slow timer -------------
     weather.timer += dt;
@@ -203,6 +222,10 @@ export function createWeather(scene, city, daynight) {
         weather.nextBolt = 4 + Math.random() * 6;
         weather.flash = 1;
         weather.flashHold = 0.25;
+        // Phase 7: the bolt wanders — each strike relights the sky from
+        // a new point over the city, so the strobe never comes from the
+        // same corner twice in a row.
+        bolt.position.set(-200 + Math.random() * 400, 220, -200 + Math.random() * 400);
         if (audio && audio.thunder) audio.thunder();
       }
     }
@@ -219,6 +242,8 @@ export function createWeather(scene, city, daynight) {
   weather.gripFactor = gripFactor;
   weather.seaBreeze = seaBreeze;
   weather.iconText = iconText;
+  weather.nextChangeIn = nextChangeIn;
+  weather.forecast = forecast;
   weather.update = update;
   weather.updateRainRipples = updateRainRipples;
   weather.raining = false;

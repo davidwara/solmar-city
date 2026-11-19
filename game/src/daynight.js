@@ -76,6 +76,26 @@ export function isGoldenHour(hours) {
   return h >= 17 && h < 19;
 }
 
+/**
+ * Phase 7: true at dusk (19:00–20:30), the half-light between the
+ * golden hour and the deep night, when the lamps are already on and the
+ * moon is coming up.
+ */
+export function isDusk(hours) {
+  const h = ((hours % 24) + 24) % 24;
+  return h >= 19 && h < 20.5;
+}
+
+/**
+ * Phase 7: how far into dusk the hour is, 0 at 19:00 rising to 1 at
+ * 20:30 — the lamps ramp up through it instead of snapping on at dark.
+ */
+export function duskFactor(hours) {
+  const h = ((hours % 24) + 24) % 24;
+  if (h < 19 || h >= 20.5) return 0;
+  return (h - 19) / 1.5;
+}
+
 /** Create the day/night system. The city starts at 10:00, mid-morning. */
 export function createDayNight(scene, city) {
   // Lamp glows: soft additive sprites at every street lamp, invisible by
@@ -133,8 +153,12 @@ export function createDayNight(scene, city) {
     city.hemi.intensity = k.hemi * (1 - daynight.stormDim * 0.3);
     daynight.nightFactor = k.night;
     daynight.isNight = k.night > 0.5;
-    for (const g of glows) g.material.opacity = k.night * 0.85;
-    if (city.lampMat) city.lampMat.color.setHex(k.night > 0.5 ? 0xffe9a8 : 0xfff2c0);
+    // Phase 7: the lamps wake up early — in the golden hour (17:00–19:00)
+    // they already glow at a third strength, then ramp up through dusk
+    // (19:00–20:30), so evening never snaps dark.
+    const lampGlow = Math.max(k.night, isGoldenHour(daynight.hours) ? 0.35 : 0, duskFactor(daynight.hours) * 0.6);
+    for (const g of glows) g.material.opacity = lampGlow * 0.85;
+    if (city.lampMat) city.lampMat.color.setHex(lampGlow > 0.2 ? 0xffe9a8 : 0xfff2c0);
     moon.visible = daynight.isNight;
   }
 

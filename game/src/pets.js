@@ -98,6 +98,18 @@ export function createPets(scene, audio, collectibles, gangs) {
       if (near.length > 0) bark();
     }
 
+    // Phase 7: a thrilled Biscuit scouts ahead on his own — at 90+
+    // happiness he catches a scent and points at any package within 20m
+    // without waiting for V.
+    if (!pets.pointing && pets.happiness >= 90 && collectibles && collectibles.nearestPackage) {
+      const scent = collectibles.nearestPackage(playerPos);
+      if (scent && Math.hypot(scent.x - playerPos.x, scent.z - playerPos.z) < 20) {
+        pets.pointing = { x: scent.x, z: scent.z };
+        pets.lastPoint = 'Biscuit caught a scent — follow him!';
+        bark();
+      }
+    }
+
     // Target: a package he is pointing at, otherwise Mara's heel.
     let tx = playerPos.x;
     let tz = playerPos.z;

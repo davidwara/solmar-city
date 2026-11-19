@@ -1,282 +1,378 @@
-// HUD: health, money, wanted stars, mission tracker, and a live 2D minimap.
-// The minimap is a top-down canvas: roads, beach, sea, the player arrow,
-// parked cars, moving traffic (grey), police (flashing blue/red), nearby
-// pedestrians (tiny dots) and the current mission marker (gold diamond).
-// Phase 3 adds the pistol ammo counter, the day/night clock, a flashing
-// wanted display, and gun-shop + bodyguard-client markers on the minimap.
+// HUD: the health bar, money, wanted stars, objective, speed and hint
+// lines, the mission list, toasts and the camera flash — plus a live 2D
+// minimap of the whole bay, from downtown to the second island. Pure
+// DOM + canvas 2D; it never touches the 3D scene, it only reads the
+// state object the game loop hands it each frame.
 import { CITY } from './city.js';
 import { clamp01, formatMoney } from './utils.js';
 
-const STREETS = CITY.streets;
+// The minimap covers the mainland and the second island: world −240 to
+// 440 on both axes, drawn into a 190px square canvas.
+const WORLD_MIN = -240;
+const WORLD_MAX = 440;
+const MAP_SIZE = 190;
 
-export function createHud() {
-  const els = {
-    healthFill: document.getElementById('health-fill'),
-    healthText: document.getElementById('health-text'),
-    money: document.getElementById('money'),
-    wanted: document.getElementById('wanted'),
-    objective: document.getElementById('objective'),
-    speed: document.getElementById('speed'),
-    hint: document.getElementById('hint'),
-    minimap: document.getElementById('minimap'),
-    toast: document.getElementById('toast'),
-    missionList: document.getElementById('mission-list'),
-    ammo: document.getElementById('ammo'),
-    clock: document.getElementById('clock'),
-    weather: document.getElementById('weather'),
-    packages: document.getElementById('packages'),
-    station: document.getElementById('station'),
-    flash: document.getElementById('flash'),
-    turf: document.getElementById('turf'),
-    sideLine: document.getElementById('side-line'),
-  };
-  const ctx = els.minimap.getContext('2d');
-  const S = els.minimap.width; // 190
-  const WORLD_MIN = -240;
-  const WORLD_MAX = 440; // Phase 5: the minimap now reaches the second island across the bay
-  const scale = S / (WORLD_MAX - WORLD_MIN);
-  function toMap(x, z) {
-    return [(x - WORLD_MIN) * scale, (z - WORLD_MIN) * scale];
+// Island bounds (and the lighthouse) when the state does not carry them.
+const ISLAND_FALLBACK = { minX: -80, maxX: 160, minZ: 300, maxZ: 430 };
+const LIGHTHOUSE_FALLBACK = { x: 120, z: 398 };
+
+/** Show one overlay screen and hide the other; null hides both. */
+export function showScreen(id) {
+  for (const screenId of ['start-screen', 'pause-screen']) {
+    const el = document.getElementById(screenId);
+    if (el) el.style.display = screenId === id ? 'flex' : 'none';
   }
-  let toastTimer = null;
-  let flashPhase = 0;
+}
 
-  function drawMinimap(playerPos, heading, cars, inCar, objectivePos, extra) {
-    flashPhase += 0.08;
-    ctx.fillStyle = '#101820';
-    ctx.fillRect(0, 0, S, S);
-    // Sea + beach (south edge).
-    const [, seaY] = toMap(0, 250);
-    ctx.fillStyle = '#1e6fa8';
-    ctx.fillRect(0, seaY, S, S - seaY);
-    const [, sandY] = toMap(0, 210);
-    ctx.fillStyle = '#d9c184';
-    ctx.fillRect(0, sandY, S, seaY - sandY);
-    // Phase 5: the second island across the bay (sand + grass block).
-    if (extra.island) {
-      const [ix1, iz1] = toMap(extra.island.minX, extra.island.minZ);
-      const [ix2, iz2] = toMap(extra.island.maxX, extra.island.maxZ);
-      ctx.fillStyle = '#d9c184';
-      ctx.fillRect(ix1, iz1, ix2 - ix1, iz2 - iz1);
-      ctx.fillStyle = '#6fae62';
-      ctx.fillRect(ix1 + 3, iz1 + 3, ix2 - ix1 - 6, iz2 - iz1 - 6);
-      // Lighthouse dot on the island's south tip.
-      if (extra.lighthousePos) {
-        const [lx, ly] = toMap(extra.lighthousePos.x, extra.lighthousePos.z);
-        ctx.fillStyle = extra.lighthouseLit ? '#fff6c8' : '#ff5a5a';
-        ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, Math.PI * 2); ctx.fill();
+/** Grab the HUD elements and the minimap context. Returns the per-frame
+ *  update plus the toast / mission-list / flash helpers. */
+export function createHud() {
+  const byId = (id) => document.getElementById(id);
+  const els = {
+    healthFill: byId('health-fill'),
+    healthText: byId('health-text'),
+    money: byId('money'),
+    wanted: byId('wanted'),
+    objective: byId('objective'),
+    speed: byId('speed'),
+    hint: byId('hint'),
+    minimap: byId('minimap'),
+    toast: byId('toast'),
+    missionList: byId('mission-list'),
+    ammo: byId('ammo'),
+    clock: byId('clock'),
+    weather: byId('weather'),
+    packages: byId('packages'),
+    station: byId('station'),
+    flash: byId('flash'),
+    turf: byId('turf'),
+    sideLine: byId('side-line'),
+    staminaFill: byId('stamina-fill'),
+  };
+  const mapCtx = els.minimap ? els.minimap.getContext('2d') : null;
+
+  let toastTimer = null;
+  let flashTimer = null;
+  let listShowing = false;
+
+  /** A hex colour (number or '#rrggbb') as a CSS string. */
+  function css(color) {
+    if (typeof color === 'number') return `#${color.toString(16).padStart(6, '0')}`;
+    return color || '#ffffff';
+  }
+
+  /** A translucent fill from a colour + alpha, via globalAlpha. */
+  function disc(x, y, r, color, alpha = 1) {
+    mapCtx.globalAlpha = alpha;
+    mapCtx.fillStyle = css(color);
+    mapCtx.beginPath();
+    mapCtx.arc(x, y, r, 0, Math.PI * 2);
+    mapCtx.fill();
+    mapCtx.globalAlpha = 1;
+  }
+
+  function diamond(x, y, r, color) {
+    mapCtx.fillStyle = css(color);
+    mapCtx.beginPath();
+    mapCtx.moveTo(x, y - r);
+    mapCtx.lineTo(x + r, y);
+    mapCtx.lineTo(x, y + r);
+    mapCtx.lineTo(x - r, y);
+    mapCtx.closePath();
+    mapCtx.fill();
+  }
+
+  function square(x, y, r, color) {
+    mapCtx.fillStyle = css(color);
+    mapCtx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+
+  /** Draw one Phase 6-style marker in its own shape and colour. */
+  function drawMarker(m, toX, toY) {
+    const x = toX(m.x);
+    const y = toY(m.z);
+    const r = m.r || 4;
+    if (m.shape === 'diamond') diamond(x, y, r, m.color);
+    else if (m.shape === 'square') square(x, y, r, m.color);
+    else if (m.shape === 'flag') {
+      mapCtx.strokeStyle = css(m.color);
+      mapCtx.lineWidth = 2;
+      mapCtx.beginPath();
+      mapCtx.moveTo(x, y + r);
+      mapCtx.lineTo(x, y - r);
+      mapCtx.moveTo(x, y - r);
+      mapCtx.lineTo(x + r, y - r + 3);
+      mapCtx.stroke();
+    } else disc(x, y, r, m.color);
+  }
+
+  /** The minimap: sea and beach bands, the island, turf, roads, and
+   *  every live dot — traffic, peds, cars, police, the player arrow. */
+  function drawMinimap(state) {
+    if (!mapCtx) return;
+    const scale = MAP_SIZE / (WORLD_MAX - WORLD_MIN);
+    const toX = (x) => (x - WORLD_MIN) * scale;
+    const toY = (z) => (z - WORLD_MIN) * scale;
+    const ex = state.extras || {};
+    const playerPos = state.playerPos || { x: 0, z: 0 };
+    const now = performance.now() / 1000;
+    // Minimap sources live on the state itself (main.js passes them
+    // top-level); the extras object is only a fallback.
+    const traffic = state.traffic ?? ex.traffic ?? [];
+    const police = state.police ?? ex.police ?? [];
+    const peds = state.peds ?? ex.peds ?? [];
+    const shopPos = state.shopPos ?? ex.shopPos ?? null;
+    const vipPos = state.vipPos ?? ex.vipPos ?? null;
+    const packageDots = state.packageDots ?? ex.packages ?? (Array.isArray(state.packages) ? state.packages : []);
+    const island = state.island ?? ex.island ?? null;
+    const lighthousePos = state.lighthousePos ?? ex.lighthousePos ?? null;
+    const lighthouseLit = state.lighthouseLit ?? ex.lighthouseLit ?? false;
+    const turfZones = state.turfZones ?? ex.turfZones ?? [];
+    const boats = state.boats ?? ex.boats ?? [];
+    const garagePos = state.garagePos ?? ex.garagePos ?? null;
+    const phase6src = state.phase6Markers ?? ex.phase6 ?? [];
+
+    // Dark ground, then the sea (z >= 250) and the beach (210–250).
+    mapCtx.fillStyle = '#101820';
+    mapCtx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+    mapCtx.fillStyle = '#2e7fb8';
+    mapCtx.fillRect(0, toY(250), MAP_SIZE, MAP_SIZE - toY(250));
+    mapCtx.fillStyle = '#e8d29a';
+    mapCtx.fillRect(0, toY(210), MAP_SIZE, toY(250) - toY(210));
+
+    // The second island: sand rect, green inner rect, and the
+    // lighthouse dot on its south tip — pale gold when lit, red when dark.
+    if (island) {
+      const b = island.minX !== undefined ? island : ISLAND_FALLBACK;
+      mapCtx.fillStyle = '#e8d29a';
+      mapCtx.fillRect(toX(b.minX), toY(b.minZ), (b.maxX - b.minX) * scale, (b.maxZ - b.minZ) * scale);
+      mapCtx.fillStyle = '#6fae62';
+      mapCtx.fillRect(toX(b.minX + 12), toY(b.minZ + 10), (b.maxX - b.minX - 24) * scale, (b.maxZ - b.minZ - 20) * scale);
+      const lp = lighthousePos || LIGHTHOUSE_FALLBACK;
+      disc(toX(lp.x), toY(lp.z), 4, lighthouseLit ? '#ffe9a8' : '#ff3b30');
+    }
+
+    // Gang turf zones: translucent discs, a gold ring when Mara owns
+    // one, a white progress arc while a claim is in progress.
+    for (const zone of turfZones) {
+      const cx = toX(zone.center.x);
+      const cy = toY(zone.center.z);
+      disc(cx, cy, zone.radius * scale, zone.color || zone.css || '#888888', 0.35);
+      if (zone.owner === 'mara') {
+        mapCtx.strokeStyle = '#ffd23f';
+        mapCtx.lineWidth = 2;
+        mapCtx.beginPath();
+        mapCtx.arc(cx, cy, zone.radius * scale, 0, Math.PI * 2);
+        mapCtx.stroke();
+      }
+      const prog = zone.claimProgress || 0;
+      if (prog > 0 && prog < 1) {
+        mapCtx.strokeStyle = '#ffffff';
+        mapCtx.lineWidth = 2;
+        mapCtx.beginPath();
+        mapCtx.arc(cx, cy, zone.radius * scale, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2);
+        mapCtx.stroke();
       }
     }
-    // Phase 5: gang turf zones — coloured rings, gold when Mara owns them.
-    for (const zone of extra.turfZones || []) {
-      const [zx, zy] = toMap(zone.center.x, zone.center.z);
-      const zr = zone.radius * scale;
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle = zone.css;
-      ctx.beginPath(); ctx.arc(zx, zy, zr, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = zone.owner === 'mara' ? '#ffd23f' : zone.css;
-      ctx.lineWidth = zone.owner === 'mara' ? 3 : 1.5;
-      ctx.beginPath(); ctx.arc(zx, zy, zr, 0, Math.PI * 2); ctx.stroke();
-      // Claim progress: a filling arc while Mara stands in the zone.
-      if (zone.claimProgress > 0 && zone.claimProgress < 1) {
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(zx, zy, zr - 3, -Math.PI / 2, -Math.PI / 2 + zone.claimProgress * Math.PI * 2); ctx.stroke();
-      }
+
+    // Boats as white diamonds, the garage as an orange square.
+    for (const boat of boats) {
+      const p = boat.pos || boat;
+      diamond(toX(p.x), toY(p.z), 4, '#ffffff');
     }
-    // Phase 5: boats (white diamonds on the water) and the garage (orange square).
-    for (const boat of extra.boats || []) {
-      const [bx, by] = toMap(boat.pos.x, boat.pos.z);
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.moveTo(bx, by - 4); ctx.lineTo(bx + 3, by); ctx.lineTo(bx, by + 4); ctx.lineTo(bx - 3, by);
-      ctx.closePath(); ctx.fill();
+    if (garagePos) square(toX(garagePos.x), toY(garagePos.z), 5, '#ff7a2a');
+
+    // Roads: grey lines on every street centreline, both directions.
+    mapCtx.strokeStyle = '#5a6068';
+    mapCtx.lineWidth = 2;
+    for (const s of CITY.streets) {
+      mapCtx.beginPath();
+      mapCtx.moveTo(toX(s), 0);
+      mapCtx.lineTo(toX(s), MAP_SIZE);
+      mapCtx.stroke();
+      mapCtx.beginPath();
+      mapCtx.moveTo(0, toY(s));
+      mapCtx.lineTo(MAP_SIZE, toY(s));
+      mapCtx.stroke();
     }
-    if (extra.garagePos) {
-      const [gx, gy] = toMap(extra.garagePos.x, extra.garagePos.z);
-      ctx.fillStyle = '#ff7a2a';
-      ctx.fillRect(gx - 3.5, gy - 3.5, 7, 7);
+
+    // The mission marker: a pulsing gold diamond on the objective.
+    if (state.objectivePos) {
+      const pulse = 5 + Math.sin(now * 4) * 1.5;
+      diamond(toX(state.objectivePos.x), toY(state.objectivePos.z), pulse, '#ffd23f');
     }
-    // Roads.
-    ctx.strokeStyle = '#5a636e';
-    ctx.lineWidth = 5;
-    for (const c of STREETS) {
-      const [x] = toMap(c, 0);
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, S); ctx.stroke();
-      const [, z] = toMap(0, c);
-      ctx.beginPath(); ctx.moveTo(0, z); ctx.lineTo(S, z); ctx.stroke();
+
+    // Moving traffic as grey dots.
+    for (const w of traffic) {
+      const p = (w.car && w.car.pos) || w.pos || w;
+      if (p) disc(toX(p.x), toY(p.z), 2.5, '#9aa4ae');
     }
-    // Mission marker (gold diamond, pulsing).
-    if (objectivePos) {
-      const [ox, oy] = toMap(objectivePos.x, objectivePos.z);
-      const r = 7 + Math.sin(flashPhase * 2) * 1.5;
-      ctx.fillStyle = '#ffd23f';
-      ctx.beginPath();
-      ctx.moveTo(ox, oy - r); ctx.lineTo(ox + r * 0.85, oy); ctx.lineTo(ox, oy + r); ctx.lineTo(ox - r * 0.85, oy);
-      ctx.closePath(); ctx.fill();
-    }
-    // Moving traffic (grey dots).
-    for (const w of extra.traffic || []) {
-      const [tx, ty] = toMap(w.car.pos.x, w.car.pos.z);
-      ctx.fillStyle = '#b8c4cc';
-      ctx.beginPath(); ctx.arc(tx, ty, 2.5, 0, Math.PI * 2); ctx.fill();
-    }
-    // Pedestrians (tiny pale dots, only near the player to avoid clutter).
-    for (const p of extra.peds || []) {
+
+    // Nearby pedestrians (within 90m): tiny pale dots, red when down.
+    for (const p of peds) {
       const d = Math.hypot(p.pos.x - playerPos.x, p.pos.z - playerPos.z);
       if (d > 90) continue;
-      const [px, py] = toMap(p.pos.x, p.pos.z);
-      ctx.fillStyle = p.down ? '#ff5a5a' : '#d8e6ee';
-      ctx.beginPath(); ctx.arc(px, py, 1.6, 0, Math.PI * 2); ctx.fill();
+      disc(toX(p.pos.x), toY(p.pos.z), 1.8, p.down ? '#ff3b30' : '#e8f4ff');
     }
-    // Parked cars (orange; white when driven).
-    for (const car of cars) {
-      const [cx, cy] = toMap(car.pos.x, car.pos.z);
-      ctx.fillStyle = car.driven ? '#ffffff' : '#ff8a3d';
-      ctx.beginPath(); ctx.arc(cx, cy, car.driven ? 4 : 3, 0, Math.PI * 2); ctx.fill();
+
+    // Parked cars as orange dots — the driven one white and larger.
+    for (const car of state.cars || []) {
+      const p = car.pos || car;
+      disc(toX(p.x), toY(p.z), car.driven ? 4 : 2.5, car.driven ? '#ffffff' : '#ff7a2a');
     }
-    // Police (flashing blue/red).
-    for (const unit of extra.police || []) {
-      const [px, py] = toMap(unit.car.pos.x, unit.car.pos.z);
-      ctx.fillStyle = Math.sin(flashPhase * 3) > 0 ? '#3d7bff' : '#ff3d3d';
-      ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+
+    // Police: flashing blue/red dots.
+    const copColor = Math.floor(now * 2) % 2 === 0 ? '#2266ff' : '#ff2222';
+    for (const unit of police) {
+      const p = (unit.car && unit.car.pos) || unit.pos || unit;
+      if (p) disc(toX(p.x), toY(p.z), 3.5, copColor);
     }
-    // Gun shop (green square) — the pistol lives here.
-    if (extra.shopPos) {
-      const [sx, sy] = toMap(extra.shopPos.x, extra.shopPos.z);
-      ctx.fillStyle = '#7dff8a';
-      ctx.fillRect(sx - 3.5, sy - 3.5, 7, 7);
+
+    // The gun shop as a green square, the bodyguard client as a pulsing
+    // gold ring, nearby hidden packages as cyan dots.
+    if (shopPos) square(toX(shopPos.x), toY(shopPos.z), 5, '#7dff8a');
+    if (vipPos) {
+      mapCtx.strokeStyle = '#ffd23f';
+      mapCtx.lineWidth = 2;
+      mapCtx.beginPath();
+      mapCtx.arc(toX(vipPos.x), toY(vipPos.z), 5 + Math.sin(now * 4) * 1.5, 0, Math.PI * 2);
+      mapCtx.stroke();
     }
-    // Bodyguard client (gold ring) — keep him in sight.
-    if (extra.vipPos) {
-      const [vx, vy] = toMap(extra.vipPos.x, extra.vipPos.z);
-      ctx.strokeStyle = '#ffd23f';
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(vx, vy, 5 + Math.sin(flashPhase * 2) * 1.5, 0, Math.PI * 2); ctx.stroke();
+    for (const pkg of packageDots) {
+      disc(toX(pkg.x), toY(pkg.z), 3, '#7df9ff');
     }
-    // Hidden packages (cyan dots) — only the ones Mara is close to.
-    for (const pos of extra.packages || []) {
-      const [gx, gy] = toMap(pos.x, pos.z);
-      ctx.fillStyle = '#7df9ff';
-      ctx.beginPath(); ctx.arc(gx, gy, 3, 0, Math.PI * 2); ctx.fill();
+
+    // Phase 6 markers (pier, race flag + next gate, safehouse doors,
+    // casino, courier depots + drop, Biscuit) in their own shapes.
+    const markers = Array.isArray(phase6src) ? phase6src : Object.values(phase6src).flat();
+    for (const m of markers) {
+      if (m && typeof m.x === 'number') drawMarker(m, toX, toY);
     }
-    // Phase 6 markers: the pier, race flag + next gate, safehouse doors,
-    // the casino, courier depots + drop, and Biscuit's brown dot.
-    for (const m of extra.phase6 || []) {
-      const [mx, my] = toMap(m.x, m.z);
-      ctx.fillStyle = m.color;
-      if (m.shape === 'diamond') {
-        ctx.beginPath();
-        ctx.moveTo(mx, my - m.r); ctx.lineTo(mx + m.r * 0.8, my); ctx.lineTo(mx, my + m.r); ctx.lineTo(mx - m.r * 0.8, my);
-        ctx.closePath(); ctx.fill();
-      } else if (m.shape === 'flag') {
-        ctx.fillRect(mx - 1, my - m.r - 2, 2, m.r * 2 + 2);
-        ctx.fillRect(mx + 1, my - m.r - 2, m.r, m.r * 0.6);
-      } else if (m.shape === 'square') {
-        ctx.fillRect(mx - m.r, my - m.r, m.r * 2, m.r * 2);
-      } else {
-        ctx.beginPath(); ctx.arc(mx, my, m.r, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-    // Player arrow.
-    const [px, py] = toMap(playerPos.x, playerPos.z);
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(heading);
-    ctx.fillStyle = inCar ? '#7df9ff' : '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(0, -7); ctx.lineTo(5, 6); ctx.lineTo(-5, 6);
-    ctx.closePath(); ctx.fill();
-    ctx.restore();
+
+    // The player arrow, rotated to the heading: cyan in a vehicle,
+    // white on foot.
+    const px = toX(playerPos.x);
+    const py = toY(playerPos.z);
+    const heading = state.heading || 0;
+    mapCtx.save();
+    mapCtx.translate(px, py);
+    mapCtx.rotate(heading);
+    mapCtx.fillStyle = state.inCar || state.inBoat ? '#7df9ff' : '#ffffff';
+    mapCtx.beginPath();
+    mapCtx.moveTo(0, -7);
+    mapCtx.lineTo(5, 6);
+    mapCtx.lineTo(-5, 6);
+    mapCtx.closePath();
+    mapCtx.fill();
+    mapCtx.restore();
   }
 
-  /** Flash a short message above the minimap (pickup, bust, mute, ...). */
+  /** The context hint when no Phase 6 hint is live: driving keys in a
+   *  car, sailing keys in a boat, and on foot the nearest interaction
+   *  first (boat, garage, car, gun shop), then the default on-foot keys. */
+  function contextHint(state) {
+    if (state.inCar) return 'WASD drive · E exit car · Q radio · T race at the flag';
+    if (state.inBoat) return 'WASD sail · E step ashore';
+    if (state.nearBoat) return 'E — board the boat';
+    if (state.nearGarage) return 'G — Solmar Garage';
+    if (state.nearCar) return 'E — take the car';
+    if (state.nearShop) return 'G — buy pistol ($400)';
+    return 'WASD move · Shift run · Space jump · E enter car · P pause';
+  }
+
+  /** Write the whole HUD from one state object. Missing fields fall back
+   *  to safe defaults so a partial state never throws. */
+  function update(state) {
+    const s = state || {};
+    const health = Math.max(0, s.health ?? 100);
+    if (els.healthFill) els.healthFill.style.width = `${health}%`;
+    if (els.healthText) els.healthText.textContent = String(Math.round(health));
+    if (els.staminaFill) {
+      els.staminaFill.style.width = `${clamp01((s.stamina ?? 100) / 100) * 100}%`;
+    }
+    if (els.money) els.money.textContent = formatMoney(s.money ?? 0);
+
+    const wanted = Math.max(0, Math.min(5, Math.round(s.wanted ?? 0)));
+    if (els.wanted) {
+      els.wanted.textContent = '★'.repeat(wanted) + '☆'.repeat(5 - wanted);
+      els.wanted.classList.toggle('flash', wanted > 0);
+      els.wanted.style.color = wanted > 0 ? '#ff5a5a' : '#ffd23f';
+    }
+
+    if (els.ammo) els.ammo.textContent = s.ammoText ?? s.ammo ?? '';
+    if (els.clock) {
+      els.clock.textContent = s.clockText ?? s.clock ?? '';
+      const night = s.isNight ?? s.night ?? (() => {
+        const m = /^(\d{1,2}):/.exec(s.clockText || s.clock || '');
+        if (!m) return false;
+        const h = Number(m[1]);
+        return h >= 20 || h < 6;
+      })();
+      els.clock.style.color = night ? '#7df9ff' : '#ffe9a8';
+    }
+    if (els.weather) els.weather.textContent = s.weatherIcon ?? s.weather ?? '';
+    if (els.packages) {
+      // The counter is a string; the nearby-dots array lives in
+      // packageDots, so a stray array here never prints as an object.
+      els.packages.textContent = s.packagesText
+        ?? (typeof s.packages === 'string' ? s.packages : '')
+        ?? s.packageText ?? '';
+    }
+    if (els.station) els.station.textContent = s.inCar ? (s.stationText ?? s.station ?? '') : '';
+    if (els.turf) els.turf.textContent = s.turfText ?? s.turf ?? '';
+    if (els.sideLine) els.sideLine.textContent = s.sideText ?? s.sideLine ?? s.side ?? '';
+    if (els.objective) els.objective.textContent = s.objective ?? '';
+
+    if (els.speed) {
+      // Car speed arrives in m/s — the HUD shows km/h. The boat speed
+      // already arrives in km/h (the boats speed helper converts it).
+      if (s.inBoat) els.speed.textContent = `${Math.round(s.boatSpeed ?? s.speedKmh ?? 0)} km/h · BOAT`;
+      else if (s.inCar) els.speed.textContent = `${Math.round((s.speedKmh ?? (s.speed ?? 0) * 3.6))} km/h`;
+      else els.speed.textContent = '';
+    }
+    if (els.hint) {
+      els.hint.textContent = s.phase6Hint || s.hint || contextHint(s);
+    }
+
+    drawMinimap(s);
+  }
+
+  /** A toast line for a few seconds (any previous toast is replaced). */
   function showToast(text, ms = 2600) {
     if (!els.toast) return;
     els.toast.textContent = text;
     els.toast.style.display = 'block';
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { els.toast.style.display = 'none'; }, ms);
+    toastTimer = setTimeout(() => {
+      els.toast.style.display = 'none';
+      toastTimer = null;
+    }, ms);
   }
 
-  /** Camera flash for the Shutterbug job: a white blink over the frame. */
+  /** The white camera flash for the Shutterbug job: 140ms, then gone. */
   function showFlash() {
     if (!els.flash) return;
     els.flash.style.display = 'block';
-    setTimeout(() => { els.flash.style.display = 'none'; }, 140);
+    if (flashTimer) clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      els.flash.style.display = 'none';
+      flashTimer = null;
+    }, 140);
   }
 
-  /** Show / hide the jobs (mission list) panel. */
+  /** Toggle the mission-list panel; when showing, fill it with the
+   *  text. Returns whether it is now showing. */
   function toggleMissionList(text) {
     if (!els.missionList) return false;
-    const showing = els.missionList.style.display !== 'block';
-    els.missionList.style.display = showing ? 'block' : 'none';
-    if (showing) els.missionList.textContent = text;
-    return showing;
-  }
-
-  function update(state) {
-    els.healthFill.style.width = Math.max(0, state.health) + '%';
-    els.healthText.textContent = Math.round(state.health);
-    els.money.textContent = formatMoney(state.money);
-    // Wanted: up to 3 stars shine red-hot, the rest stay empty. While the
-    // law is on Mara the whole row pulses so it cannot be missed.
-    const stars = '★'.repeat(state.wanted) + '☆'.repeat(5 - state.wanted);
-    els.wanted.textContent = stars;
-    els.wanted.style.color = state.wanted > 0 ? '#ff5a5a' : '#ffd23f';
-    els.wanted.style.opacity = state.wanted > 0 ? 0.65 + 0.35 * clamp01(Math.abs(Math.sin(flashPhase * 2))) : 1;
-    els.wanted.classList.toggle('flash', state.wanted > 0);
-    // Phase 3 readouts: pistol ammo (or the shop hint) and the clock.
-    if (els.ammo) els.ammo.textContent = state.ammoText || '';
-    if (els.clock) {
-      els.clock.textContent = state.clockText || '';
-      els.clock.style.color = state.isNight ? '#9db8ff' : '#ffe9a8';
+    listShowing = !listShowing;
+    if (listShowing) {
+      if (text !== undefined) els.missionList.textContent = text;
+      els.missionList.style.display = 'block';
+    } else {
+      els.missionList.style.display = 'none';
     }
-    // Phase 4 readouts: weather, hidden-package count, radio station.
-    if (els.weather) els.weather.textContent = state.weatherIcon || '';
-    if (els.packages) els.packages.textContent = state.packagesText || '';
-    if (els.station) els.station.textContent = state.inCar ? (state.stationText || '') : '';
-    // Phase 5 readouts: turf owned, and boat speed on the water.
-    if (els.turf) els.turf.textContent = state.turfText || '';
-    // Phase 6 readout: the side-hustle line (fishing, race, courier,
-    // casino, safehouse, Biscuit) under the counters.
-    if (els.sideLine) els.sideLine.textContent = state.sideText || '';
-    els.objective.textContent = state.objective;
-    els.speed.textContent = state.inCar
-      ? Math.round(Math.abs(state.speed) * 3.6) + ' km/h'
-      : state.inBoat
-        ? Math.round(state.boatSpeed || 0) + ' km/h · BOAT'
-        : '';
-    els.hint.textContent = state.phase6Hint || (state.inCar
-      ? 'WASD drive · E exit car · F punch · M mute · J jobs · P pause'
-      : state.inBoat
-        ? 'WASD sail · E step ashore · M mute · J jobs · P pause'
-        : (state.nearBoat ? 'E — board the boat · F punch · Click shoot · R reload · M mute · J jobs' : state.nearGarage ? 'G — Solmar Garage: paint, engine & armour · WASD move · Shift run · Space jump · F punch · M mute · J jobs · P pause' : state.nearCar ? 'E — take the car · F punch · Click shoot · R reload · M mute · J jobs' : state.nearShop ? 'G — buy pistol $400 · WASD move · Shift run · Space jump · F punch · M mute · J jobs · P pause' : 'WASD move · Shift run · Space jump · E enter car · F punch · Click shoot · M mute · J jobs · P pause'));
-    drawMinimap(state.playerPos, state.heading, state.cars, state.inCar, state.objectivePos, {
-      traffic: state.traffic || [],
-      police: state.police || [],
-      peds: state.peds || [],
-      shopPos: state.shopPos || null,
-      vipPos: state.vipPos || null,
-      packages: state.packageDots || [],
-      island: state.island || null,
-      lighthousePos: state.lighthousePos || null,
-      lighthouseLit: state.lighthouseLit || false,
-      turfZones: state.turfZones || [],
-      boats: state.boats || [],
-      garagePos: state.garagePos || null,
-      phase6: state.phase6Markers || [],
-    });
+    return listShowing;
   }
 
   return { update, showToast, toggleMissionList, showFlash };
-}
-
-/** Show or hide the start screen / pause menu overlays. */
-export function showScreen(id) {
-  for (const name of ['start-screen', 'pause-screen']) {
-    const el = document.getElementById(name);
-    if (el) el.style.display = name === id ? 'flex' : 'none';
-  }
 }

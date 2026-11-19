@@ -17,7 +17,7 @@
 // golden hour, Biscuit at her heel) and 'race' (Mara lined up at the
 // garage flag for the Harbour Sprint) — and the chase pose runs at three
 // stars now, so the patrol cars' ram run shows in the frame.
-export const SHOT_NAMES = ['drive', 'street', 'vista', 'menu', 'chase', 'mission', 'night', 'fish', 'race'];
+export const SHOT_NAMES = ['drive', 'street', 'vista', 'menu', 'chase', 'mission', 'night', 'fish', 'race', 'dawn'];
 
 /**
  * Stage a pose. ctx: { scene, city, player, cars, traffic, peds, police,
@@ -193,6 +193,28 @@ export function stageShot(name, ctx) {
     peds.place(1, 138, 210);
     // Behind the car, over its roof, up the avenue toward the first gate.
     ctx.setCamera(124, 7, 224, 124, 2, 150);
+    ctx.setState('playing');
+    return 'fixed';
+  }
+  if (name === 'dawn') {
+    // Phase 7: sunrise over the marina — Mara on foot at the pier root,
+    // the moored boats and the causeway in the first light, a pedestrian
+    // already out on the beachfront, the day's first job waiting.
+    ctx.daynight.setHours(6.5);
+    missions.startMission(0);
+    player.pos.set(-146, 0, 214);
+    player.heading = Math.PI; // facing south, out over the bay
+    ctx.exitCar(true);
+    const moored = cars[0];
+    moored.pos.set(-62, 0, 186);
+    moored.heading = Math.PI / 2;
+    moored.group.position.set(-62, 0, 186);
+    moored.group.rotation.y = Math.PI / 2;
+    peds.place(0, -120, 200);
+    peds.place(1, -100, 214);
+    traffic.place(0, 62, 186, 'ew', 1, 10);
+    // Low from the beach, looking south-east down the marina and the bay.
+    ctx.setCamera(-120, 6, 190, -150, 2, 250);
     ctx.setState('playing');
     return 'fixed';
   }

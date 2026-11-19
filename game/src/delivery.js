@@ -34,6 +34,10 @@ const DROPS = [
 
 const BASE_PAY = 40;
 const MAX_TIP = 60;
+// Phase 7: a rush bonus — deliver with more than 60% of the timer left
+// and the depot adds $15 for the speed.
+const RUSH_BONUS = 15;
+const RUSH_FRACTION = 0.6;
 
 export function createDelivery(scene) {
   // A parcel crate and a painted sign at each depot so they read as
@@ -127,12 +131,13 @@ export function createDelivery(scene) {
     const d = Math.hypot(focusPos.x - job.drop.x, focusPos.z - job.drop.z);
     if (d < 5) {
       const tip = Math.round((job.timeLeft / job.timeTotal) * MAX_TIP);
-      const pay = BASE_PAY + tip;
+      const rush = job.timeLeft / job.timeTotal > RUSH_FRACTION ? RUSH_BONUS : 0;
+      const pay = BASE_PAY + tip + rush;
       delivery.jobsDone += 1;
-      delivery.tipsEarned += tip;
+      delivery.tipsEarned += tip + rush;
       delivery.job = null;
       dropMarker.visible = false;
-      delivery.lastResult = `Delivered to ${job.drop.label} — ${formatMoney(BASE_PAY)} + ${formatMoney(tip)} tip.`;
+      delivery.lastResult = `Delivered to ${job.drop.label} — ${formatMoney(BASE_PAY)} + ${formatMoney(tip)} tip${rush > 0 ? ` + ${formatMoney(rush)} rush bonus` : ''}.`;
       return { delivered: true, pay, tip };
     }
     return null;
