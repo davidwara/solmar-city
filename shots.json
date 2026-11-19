@@ -1,1 +1,22 @@
-[{"description":"Mara driving downtown at 10:00, towers ahead, traffic on the avenue, pedestrians on the sidewalk, HUD, minimap and job tracker live.","name":"1-cover.jpg","query":"?shot=drive&seed=1"},{"description":"Three-star police ram run in golden late-afternoon light: three patrol cars going straight for Mara's bumper during the Hot Delivery job, traffic ahead, RAM RUN warning on the HUD.","name":"2-chase.jpg","query":"?shot=chase&seed=1"},{"description":"Fishing off the east pier at golden hour 17:30: Mara's line cast, the bobber on the bay off the pier tip, Biscuit the stray dog at her heel, the second island and its lighthouse across the water.","name":"3-mission.jpg","query":"?shot=fish&seed=7"},{"description":"Storm night at 22:00 on the beachfront: lamps glowing, moon up, lightning strobing the sky, rain falling, Mara's car at the intersection with downtown towers behind and traffic cruising with headlights.","name":"4-night.jpg","query":"?shot=night&seed=1"}]
+[
+  {
+    "description": "Mara driving downtown at 10:00, towers ahead, traffic on the avenue, pedestrians on the sidewalk, HUD, minimap and job tracker live.",
+    "name": "1-cover.jpg",
+    "query": "?shot=drive&seed=1"
+  },
+  {
+    "description": "Three-star police ram run in golden late-afternoon light: three patrol cars going straight for Mara's bumper during the Hot Delivery job, traffic ahead, RAM RUN warning on the HUD.",
+    "name": "2-chase.jpg",
+    "query": "?shot=chase&seed=1"
+  },
+  {
+    "description": "Fishing off the east pier at golden hour 17:30: Mara's line cast, the bobber on the bay off the pier tip, Biscuit the stray dog at her heel, the second island and its lighthouse across the water.",
+    "name": "3-mission.jpg",
+    "query": "?shot=fish&seed=7"
+  },
+  {
+    "description": "Storm night at 22:00 on the beachfront: lamps glowing, moon up, lightning strobing the sky, rain falling, Mara's car at the intersection with downtown towers behind and traffic cruising with headlights.",
+    "name": "4-night.jpg",
+    "query": "?shot=night&seed=1"
+  }
+]
