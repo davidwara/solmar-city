@@ -131,6 +131,9 @@ export function createStory() {
   function showFor(jobIndex, onDone) {
     const lines = SCRIPTS[jobIndex];
     if (!lines || !overlay) return false;
+    // Never clobber a scene already playing (e.g. the Biscuit adoption):
+    // its onDone would be lost. The caller starts the job without an intro.
+    if (story.active) return false;
     story.lines = lines;
     story.index = 0;
     story.done = onDone || null;

@@ -229,9 +229,9 @@ The game stages its own screenshot scenes deterministically:
 `?shot=drive|street|vista|menu|chase|mission|night&seed=N` plays the real
 rules forward and sets `window.__shotReady` when the frame is painted.
 See `shots.json` for the four shots this entry hands in: the cover drive,
-a police chase at two stars, Job 10 Island Hopper — Mara sailing the bay
-toward the second island and its lighthouse — and Solmar City after dark
-in a storm, the lighthouse beam sweeping the bay.
+a three-star police ram run in golden late-afternoon light, Mara fishing
+off the east pier at golden hour with Biscuit at her heel, and Solmar City
+after dark in a storm, the lighthouse beam sweeping the bay.
 
 ## Entry
 

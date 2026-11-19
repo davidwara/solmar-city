@@ -12,3 +12,5 @@ shot-p5/
 shot-p6/
 # Phase 7: local dossier build output (mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts).
 out/
+# Phase 8: headless screenshot staging profile (one shared dir, wiped per pose).
+shot-p8/

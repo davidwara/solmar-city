@@ -66,8 +66,8 @@ const dossierPath = join(outDir, 'dossier.json');
 writeFileSync(dossierPath, dossier);
 
 console.log(
-  'Solmar City — Phase 7 build: city / audio / hud / main.ts rewritten, '
-  + 'missions / traffic / police / bootstrap rewritten, touches in every '
-  + 'remaining module, screenshots re-taken — dossier written to '
-  + `${dossierPath} (${dossier.length} bytes)`,
+  'Solmar City — Phase 8 build: traffic / audio / police / pedestrians / '
+  + 'weapons rewritten, missions / hud / city / bootstrap rewritten, '
+  + 'touches in every remaining module, screenshots re-taken — dossier '
+  + `written to ${dossierPath} (${dossier.length} bytes)`,
 );
